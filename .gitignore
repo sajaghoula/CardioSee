@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+env/
+venv/
+evn/
+
+# Environment & secrets
+.env
+firebase-auth.json
+
+# Medical data / images
+images/
+*.dcm
+*.nii
+*.nii.gz
+*.mha
+
+# OS
+.DS_Store
+firebase-auth.json
+.env
+

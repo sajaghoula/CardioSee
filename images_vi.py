@@ -1,0 +1,459 @@
+from flask import Blueprint, request, jsonify
+from skimage.measure import shannon_entropy
+from scipy.stats import skew, kurtosis
+import plotly.graph_objects as go
+from skimage.filters import sobel
+from skimage import measure
+import SimpleITK as sitk
+from io import BytesIO
+import nibabel as nib
+from PIL import Image
+import pyvista as pv
+import numpy as np
+import pydicom
+import base64
+import os
+
+from firebase_admin import firestore
+from firebase_admin import auth
+from datetime import datetime
+
+
+
+image_bp = Blueprint('image_bp', __name__)
+
+
+# Store the loaded volume in memory (for simplicity)
+volume_store = {}
+
+
+@image_bp.route('/upload_image', methods=['POST'])
+def upload_image():
+    file = request.files.get('file')
+    if not file:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    filename = file.filename.lower()
+
+    if filename.endswith(".nii") or filename.endswith(".nii.gz"):
+        data = prepare_nifti(file, filename)
+
+
+
+    elif filename.endswith(".dcm"):
+        data = prepare_dicom(file)
+
+
+    elif filename.endswith(".mha"):
+        data = prepare_mha(file)
+
+
+    else:
+        return jsonify({"error": "Unsupported file type"}), 400
+    
+
+
+    return data
+
+
+# Return a single slice on demand
+@image_bp.route('/get_slice', methods=['GET'])
+def get_slice():
+    view = request.args.get('view')  # axial / sagittal / coronal
+    index = int(request.args.get('index', 0))
+
+    vol = volume_store.get('volume')
+    if vol is None:
+        return jsonify({"error": "No volume loaded"}), 400
+
+    # Extract requested slice
+    if view == "axial":
+        if index >= vol.shape[0]:
+            index = vol.shape[0] - 1
+        slice_img = vol[index, :, :]
+    elif view == "sagittal":
+        if index >= vol.shape[2]:
+            index = vol.shape[2] - 1
+        slice_img = vol[:, :, index]
+    elif view == "coronal":
+        if index >= vol.shape[1]:
+            index = vol.shape[1] - 1
+        slice_img = vol[:, index, :]
+    else:
+        return jsonify({"error": "Invalid view"}), 400
+
+    # Normalize and convert to base64 PNG
+    slice_img = normalize_slice(slice_img)
+    b64 = array_to_base64(slice_img)
+    return jsonify({"image": b64})
+
+
+@image_bp.route('/upload_info', methods=['POST'])
+def upload_info():
+
+    db = firestore.client()
+
+    file = request.files.get("file")
+
+    if not file:
+        return jsonify({"error": "No file uploaded"}), 400
+
+
+
+    filename = file.filename
+    extension = filename.split(".")[-1].lower()
+
+    auth_header = request.headers.get("Authorization", None)
+    id_token = auth_header.split(" ")[1]
+    decoded = auth.verify_id_token(id_token, clock_skew_seconds=5)
+
+    user_uid = decoded["uid"]
+    user_email = decoded.get("email")
+    user_name = decoded.get("name")
+
+
+    info = extract_image_info(file)
+
+
+    image_doc = {
+        "name": filename,
+        "filetype": extension,
+        "createdBy": user_uid,
+        "createdAt": datetime.utcnow(),
+        "deleted": False
+    }
+    image_ref = db.collection("images").add(image_doc)
+    image_id = image_ref[1].id 
+
+    data_doc = {
+        "imageId": image_id,
+        "metadata": info.get("metadata", {}),
+        "stats": info.get("statistics", {}),
+        "geometry": info.get("geometry", {}),
+        "quality": info.get("quality", {}),
+        "createdAt": datetime.utcnow(),
+        "createdBy": user_uid
+    }
+
+
+
+    db.collection("image_data").add(data_doc)
+
+
+    # ✅ Only return 1 on success
+    return jsonify({"success": 1})
+
+
+def normalize_slice(slice_array):
+    slice_array = slice_array.astype(np.float32)
+    slice_array -= slice_array.min()
+    if slice_array.max() != 0:
+        slice_array /= slice_array.max()
+    slice_array *= 255
+    return slice_array.astype(np.uint8)
+
+
+def array_to_base64(arr):
+    arr = np.clip(arr, 0, np.max(arr))  # remove negatives
+    arr = (arr / arr.max() * 255).astype(np.uint8) if arr.max() > 0 else arr
+
+    img = Image.fromarray(arr)
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def prepare_nifti(file, filename):
+
+    temp_path = f"/tmp/{filename}"
+    file.save(temp_path)
+
+    img = nib.load(temp_path)
+    vol = img.get_fdata()
+    vol = np.nan_to_num(vol)  # remove NaNs
+    vol = vol.astype(np.float32)
+
+    # Reorder NIfTI to (Z,Y,X)
+    if vol.ndim == 3:
+        vol = np.transpose(vol, (2, 1, 0))
+
+    volume_store["volume"] = vol
+
+
+    # --- OPTIONAL: downsample volume for JS 3D viewer ---
+    max_size = 128  # max dimension for web performance
+    max_xy = 50
+    factor_x = max(1, vol.shape[2] // max_xy)
+    factor_y = max(1, vol.shape[1] // max_xy)
+    factor = max(1, max(vol.shape) // max_size)
+    vol_small = vol[::factor, ::factor_y, ::factor_x]  
+    vol_small = vol[::factor_x, ::factor, ::factor_y]  
+    vol_list = vol_small.tolist()
+
+
+
+    # vol = your 3D numpy array
+    verts, faces, normals, values = measure.marching_cubes(vol, level=50)
+
+    # Convert faces to PyVista format
+    faces_pv = np.hstack([np.full((faces.shape[0], 1), 3), faces]).astype(np.int64)
+    faces_pv = faces_pv.flatten()
+
+
+    # Plot 3D in a new tap:
+
+
+    # Create PyVista mesh
+    # mesh = pv.PolyData(verts, faces_pv)
+
+    # Render
+    # plotter = pv.Plotter()
+    # plotter.add_mesh(mesh, color='white')
+    # plotter.show()
+
+
+
+    return jsonify({
+        "depth": vol.shape[0],
+        "height": vol.shape[1],
+        "width": vol.shape[2],
+        "type": "nifti",
+        "volume_3d": vol_list,
+        "downsample_factor": factor,
+        "downsample_factorx": factor_x,
+        "downsample_factory": factor_y
+    })
+
+
+def prepare_dicom(file):
+
+        ds = pydicom.dcmread(file)
+        vol = ds.pixel_array
+
+        if vol.ndim == 2:
+            vol = vol[np.newaxis, :, :]
+
+        volume_store["volume"] = vol
+
+        # --- OPTIONAL: downsample volume for JS 3D viewer ---
+        max_size = 128  # max dimension for web performance
+        max_xy = 256
+        factor_x = max(1, vol.shape[2] // max_xy)
+        factor_y = max(1, vol.shape[1] // max_xy)
+        factor = max(1, max(vol.shape) // max_size)
+        vol_small = vol[::factor, ::factor_y, ::factor_x]  
+        vol_list = vol_small.tolist()
+
+
+        # vol = your 3D numpy array
+        verts, faces, normals, values = measure.marching_cubes(vol, level=50)
+
+        # Convert faces to PyVista format
+        faces_pv = np.hstack([np.full((faces.shape[0], 1), 3), faces]).astype(np.int64)
+        faces_pv = faces_pv.flatten()
+
+
+        # Plot 3D in a new Tap
+
+
+        # Create PyVista mesh
+        # mesh = pv.PolyData(verts, faces_pv)
+
+        # Render
+        # plotter = pv.Plotter()
+        # plotter.add_mesh(mesh, color='white')
+        # plotter.show()
+
+
+
+        return jsonify({
+            "depth": vol.shape[0],
+            "height": vol.shape[1],
+            "width": vol.shape[2],
+            "type": "dicom",
+            "volume_3d": vol_list,
+            "downsample_factor": factor,
+            "downsample_factorx": factor_x,
+            "downsample_factory": factor_y
+        })
+
+
+def prepare_mha(file):
+
+    # Save uploaded file temporarily
+    temp_path = f"/tmp/{file.filename}"
+    file.save(temp_path)
+
+    # Read the MHA
+    img = sitk.ReadImage(temp_path)
+
+    # Convert to numpy (SimpleITK returns Z,Y,X)
+    vol = sitk.GetArrayFromImage(img).astype(np.float32)
+
+    # Clean volume
+    vol = np.nan_to_num(vol)
+
+    if vol.ndim == 2:
+        vol = vol[np.newaxis, :, :]
+
+    volume_store["volume"] = vol
+
+
+    # Return metadata (same structure as your dicom function)
+    return jsonify({
+        "depth": vol.shape[0],
+        "height": vol.shape[1],
+        "width": vol.shape[2],
+        "type": "mha"
+    })
+
+
+def extract_image_info(file):
+    filename = file.filename.lower()
+
+    info = {
+        "image_type": None,
+        "modality": None,
+        "metadata": {},
+        "statistics": {},
+        "geometry": {},
+        "quality": {}
+    }
+
+    # -------------------------
+    # DICOM
+    # -------------------------
+    if filename.endswith(".dcm"):
+        ds = pydicom.dcmread(file)
+        vol = ds.pixel_array
+        if vol.ndim == 2:
+            vol = vol[np.newaxis, :, :]
+
+        info["image_type"] = "DICOM"
+        info["modality"] = getattr(ds, "Modality", "unknown")
+
+        # Metadata
+        dicom_meta = {}
+        for elem in ds:
+            if elem.tag == (0x7FE0, 0x0010):  # PixelData
+                continue
+            if elem.VR == "SQ":
+                continue
+            dicom_meta[str(elem.tag)] = str(elem.value)
+
+        info["metadata"] = dicom_meta
+
+
+    # -------------------------
+    # MHA / MHD
+    # -------------------------
+    elif filename.endswith(".mha") or filename.endswith(".mhd"):
+        temp_path = f"/tmp/{filename}"
+        file.save(temp_path)
+        img = sitk.ReadImage(temp_path)
+        vol = sitk.GetArrayFromImage(img).astype(np.float32)
+
+        info["image_type"] = "MHA"
+
+        # Metadata
+        info["metadata"] = {
+            "spacing": img.GetSpacing(),
+            "origin": img.GetOrigin(),
+            "direction": img.GetDirection()
+        }
+
+    # -------------------------
+    # NIfTI
+    # -------------------------
+    elif filename.endswith(".nii") or filename.endswith(".nii.gz"):
+        temp_path = f"/tmp/{filename}"
+        file.save(temp_path)
+        img = nib.load(temp_path)
+        vol = img.get_fdata().astype(np.float32)
+
+        info["image_type"] = "NIFTI"
+
+        # Metadata
+        info["metadata"] = {
+            "affine": img.affine.tolist(),
+            "header": {k: str(v) for k, v in dict(img.header).items()}
+        }
+
+    else:
+        return {"error": "Unsupported file type"}
+
+
+
+    # Normalize shape
+    vol = np.nan_to_num(vol)
+    if vol.ndim == 2:
+        vol = vol[np.newaxis, :, :]
+
+    # ------------------------------
+    # Statistics
+    # ------------------------------
+    flat = vol.flatten()
+
+    info["statistics"] = {
+        "shape": vol.shape,
+        "min": float(np.min(vol)),
+        "max": float(np.max(vol)),
+        "mean": float(np.mean(vol)),
+        "median": float(np.median(vol)),
+        "std": float(np.std(vol)),
+        "var": float(np.var(vol)),
+        "p25": float(np.percentile(vol, 25)),
+        "p75": float(np.percentile(vol, 75)),
+        "histogram": np.histogram(flat, bins=50)[0].tolist()
+    }
+
+    # ------------------------------
+    # Geometry
+    # ------------------------------
+    coords = np.argwhere(vol > 0)
+
+    info["geometry"] = {
+        "bounding_box": None,
+        "center_of_mass": None
+    }
+
+    if coords.size > 0:
+        info["geometry"] = {
+            "bounding_box": {
+                "min": coords.min(axis=0).tolist(),
+                "max": coords.max(axis=0).tolist()
+            },
+            "center_of_mass": coords.mean(axis=0).tolist()
+        }
+
+    # ------------------------------
+    # Quality metrics
+    # ------------------------------
+    gradient = sobel(vol.astype(np.float64))
+
+    info["quality"] = {
+        "SNR": float(np.mean(flat) / (np.std(flat) + 1e-8)),
+        "CNR": float((np.max(flat) - np.min(flat)) / (np.std(flat) + 1e-8)),
+        "entropy": float(shannon_entropy(vol)),
+        "sharpness": float(np.mean(gradient)),
+        "skewness": float(skew(flat)),
+        "kurtosis": float(kurtosis(flat))
+    }
+
+    return info
+
+
+def save_image_record(db, name, filetype, user):
+    doc_ref = db.collection("images").document()
+    image_id = doc_ref.id
+
+    doc_ref.set({
+        "pk": image_id,
+        "name": name,
+        "fileType": filetype,
+        "createdBy": user,
+        "creationDateTime": datetime.utcnow().isoformat(),
+        "deleted": False
+    })
+
+    return image_id

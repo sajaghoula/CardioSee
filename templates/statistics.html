@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statistics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+    {% include 'navbar_private.html' %}
+
+    <main>
+        <section class="analysis-container">
+            <h1>📈 General Statistics</h1>
+
+            <!-- File Upload -->
+            <div class="upload-box">
+                <input type="file" id="statsFileInput" accept=".xlsx, .xls, .csv" hidden />
+                <label for="statsFileInput" class="upload-label">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Select File</span>
+                </label>
+                <p class="hint">Supported formats: .xlsx, .xls, .csv</p>
+            </div>
+
+            <div id="statsFilePreview" class="hidden">
+                <h3>File Selected:</h3>
+                <p id="statsFileName"></p>
+
+                <!-- Sheet selector -->
+                <div style="display: flex;  align-items: center; justify-content: center; gap: 12px; width: 100%;">
+                    <div id="statsSheetSelector" class="hidden">
+                        <label>Select Sheet:</label>
+                        <select id="statsSheetSelect"></select>
+                    </div>
+                    <button id="loadColumnsBtn" class="btn">Load Columns</button>
+                </div>
+            </div>
+
+
+            <br>
+
+            <!-- Column selector -->
+            <div id="columnSelector" class="hidden">
+                <label>Select a Column:</label>
+                <select id="columnSelect"></select>
+                <button id="viewStatsBtn" class="btn">General Statistics</button>
+                <button id="viewDistributionAnalysisBtn" class="btn">Distribution Analysis</button>
+                <button id="viewCorrelationBtn" class="btn">Correlation</button>
+                
+            </div>
+
+
+
+
+            <!-- Statistics Output Block -->
+            <div id="statsResult" class="hidden">
+                <h3>📊 Column Statistics</h3>
+            
+                <div style="display: flex; gap: 2%; align-items: flex-start; flex-wrap: wrap;">
+                    <!-- Statistics Table -->
+                    <div id="statsTableContainer" style="width: 50%;">
+                        <!-- Table HTML injected here -->
+                    </div>
+
+                    <!-- Pie Chart Container (for categorical) -->
+                    <div id="pieChartContainer" style="width:35%; height:80%; display:none; padding-top: 5%;">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+
+
+
+
+
+            <!-- Correlation Section For Numeric Columns-->
+            <div id="numeric_corrContainer" class="hidden" style="margin-top: 20px;">
+                <h3>🔗 Correlation with Other Numeric Columns -SPEARMAN-</h3>
+                <div id="numeric_numeric_correlation">
+                    <!-- Correlation table will be injected here -->
+                </div>
+                <h3>🔗 Correlation with Other Categorical Columns -ANOVA-</h3>
+                <div id="numeric_categorical_correlation">
+                    <!-- Correlation table will be injected here -->
+                </div>
+            </div>
+
+
+
+
+            <!-- Correlation Section For Categorical Columns -->
+            <div id="corrContainer" class="hidden" style="margin-top: 20px;">
+                <h3>🔗 Correlation with Other Numeric Columns </h3>
+                <div id="correlationPValContainer">
+                    <h4>F Value</h4>
+                    <!-- Correlation table will be injected here -->
+                </div>
+                <div id="correlationFValContainer">
+                    <h4>P-Value</h4>
+                    <!-- Correlation table will be injected here -->
+                </div>
+                <div id="categorical_categorical_correlation">
+                    <h4>🔗 Correlation with Other Categorical Columns</h4>
+                    <!-- Correlation table will be injected here -->
+                </div>
+            </div>
+
+
+
+
+            <!-- Correlation Section For Categorical Columns -->
+            <div id="distContainer" class="hidden" style="margin-top: 20px;">
+                
+                <div id="numericalDist" class="hidden">
+                    <h3>Numerical Distribution Analysis</h3>
+
+                </div>
+
+
+                <div id="categoricalDist" class="hidden">
+                    <h3>Categorical Distribution Analysis</h3>
+                    <canvas id="catBarChart" height="150"></canvas>
+                    <div id="chiSquareTable" style="margin-top:20px;"></div>
+                </div>
+
+             
+            </div>
+
+
+
+
+
+        </section>
+
+    </main>
+
+
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.12.0/math.min.js"></script>
+
+    <!-- Load JS Files for the Statistics Module-->
+    <script src="/static/js/statistics/general_statistics.js"></script>
+    <script src="/static/js/statistics/distribution_analysis.js"></script>
+    <script src="/static/js/statistics/correlation.js"></script>
+
+    
+
+
+
+
+
+
+
+
+
+    <script>
+        const statsFileInput = document.getElementById("statsFileInput");
+        const statsFilePreview = document.getElementById("statsFilePreview");
+        const statsFileName = document.getElementById("statsFileName");
+        const statsSheetSelector = document.getElementById("statsSheetSelector");
+        const statsSheetSelect = document.getElementById("statsSheetSelect");
+
+        const loadColumnsBtn = document.getElementById("loadColumnsBtn");
+        const columnSelector = document.getElementById("columnSelector");
+        const columnSelect = document.getElementById("columnSelect");
+        const viewStatsBtn = document.getElementById("viewStatsBtn");
+        const viewCorrelationBtn = document.getElementById("viewCorrelationBtn");
+
+        const statsResult = document.getElementById("statsResult");
+        const corrContainer = document.getElementById("corrContainer");
+
+        const numeric_corrContainer = document.getElementById("numeric_corrContainer");
+        const numeric_numeric_correlation = document.getElementById("numeric_numeric_correlation");
+        const numeric_categorical_correlation = document.getElementById("numeric_categorical_correlation");
+        const categorical_categorical_correlation = document.getElementById("categorical_categorical_correlation");
+
+
+
+
+        let selectedFile = null;
+
+        // STEP 1: When selecting file
+        statsFileInput.addEventListener("change", async (e) => {
+            selectedFile = e.target.files[0];
+            if (!selectedFile) return;
+
+            statsFileName.textContent = selectedFile.name;
+            statsFilePreview.classList.remove("hidden");
+
+            // Reset UI
+            statsSheetSelector.classList.add("hidden");
+            columnSelector.classList.add("hidden");
+            statsResult.classList.add("hidden");
+            corrContainer.classList.add("hidden");
+            columnSelect.innerHTML = "";
+
+            // Ask backend for sheet names
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            const res = await fetch("/get_sheets", {
+                method: "POST",
+                body: formData
+            });
+
+            const result = await res.json();
+
+            if (result.sheets.length > 1) {
+                statsSheetSelect.innerHTML = result.sheets
+                    .map(s => `<option value="${s}">${s}</option>`)
+                    .join("");
+                statsSheetSelector.classList.remove("hidden");
+            }
+        });
+
+        // STEP 2: Load columns from selected sheet
+        loadColumnsBtn.addEventListener("click", async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            if (!statsSheetSelector.classList.contains("hidden")) {
+                formData.append("sheet_name", statsSheetSelect.value);
+            }
+
+            const res = await fetch("/get_columns", {
+                method: "POST",
+                body: formData
+            });
+
+            const result = await res.json();
+
+            if (result.error) {
+                alert(result.error);
+                return;
+            }
+
+            columnSelect.innerHTML = result.columns
+                .map(c => `<option value="${c}">${c}</option>`)
+                .join("");
+
+            columnSelector.classList.remove("hidden");
+        });
+
+
+
+
+
+
+    </script>
+</body>
+
+</html>

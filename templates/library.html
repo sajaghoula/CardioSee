@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Library</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+
+  <body>
+    {% include 'navbar_private.html' %}
+
+    <main>
+     <section class="analysis-container">
+    <h1>📚 Image Library</h1>
+    <p class="subtitle">Browse and manage all uploaded medical images.</p>
+
+    <!-- Table Wrapper -->
+    <div class="table-wrapper">
+
+
+      <div  style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+
+            <input 
+                type="text" 
+                id="searchInput" 
+                class="search-box" 
+                placeholder="Search by filename, type, or user..."
+            />
+
+
+
+            <!-- Upload Button -->
+            <button id="uploadImageBtn" class="btn-primary">➕ Image</button>
+            <input
+                type="file"
+                id="fileInput"
+                accept=".dcm, .mha, .nii, .nii.gz"
+                style="display: none;"
+            />
+
+      </div>
+
+      <section id="uploadInfoSection" class="hidden">
+          <div id="infoContainer"></div>
+          <br>
+      </section>
+
+        <table class="styled-table" id="libraryTable">
+            <thead>
+                <tr>
+                    <th data-sort="name">Filename</th>
+                    <th data-sort="filetype">Type</th>
+                    <th data-sort="createdBy">Uploaded By</th>
+                    <th data-sort="createdAt">Date</th>
+                                        
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="libraryTableBody">
+
+                <!-- Filled by JavaScript -->
+            </tbody>
+        </table>
+        <div id="pagination" class="pagination" ></div>
+
+    </div>
+
+
+
+
+        <!-- Info Modal -->
+        <div id="infoModal" class="modal">
+            <div class="modal-content">
+
+                <span class="close" onclick="closeModal()">&times;</span>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <!--  <button class="tab-btn active" data-tab="overviewTab">Overview</button> -->
+                    <button class="tab-btn active" data-tab="qualityTab">Quality</button>
+                    <button class="tab-btn" data-tab="geometryTab">Geometry</button>
+                    <button class="tab-btn" data-tab="statsTab">Statistics</button>
+                </div>
+
+                <!-- Tab Content -->
+                <!--  <div id="overviewTab" class="tab active">
+                    <div id="overviewContent"></div>
+                </div> -->
+
+                <div id="qualityTab" class="tab active">
+                    <div id="qualityContent"></div>
+                </div>
+
+                <div id="geometryTab" class="tab">
+                    <div id="geometryContent"></div>
+                </div>
+
+                <div id="statsTab" class="tab">
+                    <div id="statsContent"></div>
+                </div>
+
+            </div>
+        </div>
+
+
+
+
+
+
+
+<!-- Modal for 3 views -->
+<div class="view-container modal" id="visualModal">
+  <div class="modal-content" style="width: auto;">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <input type="hidden" id="currentFile" />
+
+    <div class="view-boxes-horizontal">
+      <div class="view-box">
+        <h3>Axial View</h3>
+        <img id="axialCanvas" class="view-img" />
+        <div class="controls">
+          <button onclick="changeSlice('axial', -1)">&#9664;</button>
+          <span id="axialIndex"></span>
+          <button onclick="changeSlice('axial', 1)">&#9654;</button>
+        </div>
+      </div>
+
+      <div class="view-box">
+        <h3>Sagittal View</h3>
+        <img id="sagittalCanvas" class="view-img" />
+        <div class="controls">
+          <button onclick="changeSlice('sagittal', -1)">&#9664;</button>
+          <span id="sagittalIndex"></span>
+          <button onclick="changeSlice('sagittal', 1)">&#9654;</button>
+        </div>
+      </div>
+
+      <div class="view-box">
+        <h3>Coronal View</h3>
+        <img id="coronalCanvas" class="view-img" />
+        <div class="controls">
+          <button onclick="changeSlice('coronal', -1)">&#9664;</button>
+          <span id="coronalIndex"></span>
+          <button onclick="changeSlice('coronal', 1)">&#9654;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- Modal for 3D visualization -->
+<div class="view-container modal" id="visualModal3D">
+  <div class="modal-content" style="width: auto;">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <input type="hidden" id="currentFile" />
+
+
+        <canvas id="renderCanvas3D"></canvas>
+
+
+
+
+   
+  </div>
+</div>
+
+
+
+
+
+
+     </section>
+    </main>
+
+
+
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <script src="/static/js/images/datatable.js"></script>
+    <script src="https://unpkg.com/vtk.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+
+
+
+    <script type="module">
+
+      import { auth } from "./static/firebase-config.js";
+      import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+
+      import { db } from "/static/firebase-config.js";
+      import { collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+
+
+      // UI Elements
+      const tableBody = document.getElementById("libraryTableBody");
+      const searchInput = document.getElementById("searchInput");
+      const uploadInfoSection = document.getElementById("uploadInfoSection");
+
+
+      let currentSort = { key: null, direction: "asc" };
+      let tableRows = [];   // Global storage
+
+      // Load table
+      loadLibraryTable();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const uploadImageBtn = document.getElementById("uploadImageBtn");
+const fileInput = document.getElementById("fileInput");
+
+
+
+fileInput.addEventListener("change", async (event) => {
+
+    uploadInfoSection.classList.remove("hidden");
+
+    const uploadedFile = event.target.files[0];
+    if (!uploadedFile) return;
+
+
+    const formData = new FormData();
+    formData.append("file", uploadedFile);
+
+    // Show loading
+    const infoContainer = document.getElementById("infoContainer");
+
+    infoContainer.style.color = "Blue";
+    infoContainer.style.fontWeight = "bold";
+    infoContainer.innerHTML = "Uploading...";
+
+    const user = auth.currentUser;
+
+
+
+    try {
+        const idToken = await user.getIdToken(true);
+
+        
+
+        const res = await fetch("/upload_info", {
+            method: "POST",
+            headers: {
+                "Authorization": "Bearer " + idToken
+            },
+            body: formData
+        });
+
+        const result = await res.json();
+
+        if (result.success === 1) {
+            infoContainer.style.color = "green";
+            infoContainer.style.fontWeight = "bold";
+            infoContainer.innerHTML = "✅ File successfully uploaded!";
+
+            await loadLibraryTable();
+        } else {
+            infoContainer.style.color = "red";
+            infoContainer.style.fontWeight = "bold";
+            infoContainer.innerHTML = "❌ Upload failed.";
+        }
+    } catch (err) {
+        console.error(err);
+        infoContainer.style.color = "red";
+        infoContainer.style.fontWeight = "bold";
+        infoContainer.innerHTML = "❌ Upload error!";
+    }
+
+    setTimeout(() => {
+        infoContainer.innerHTML = "";
+    }, 3000);
+});
+
+// Trigger file input when the button is clicked
+uploadImageBtn.addEventListener("click", () => fileInput.click());
+
+
+    </script>
+
+
+  </body>
+</html>

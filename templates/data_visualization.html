@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Visualization</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+
+  <body>
+    {% include 'navbar_private.html' %}
+
+    <main>
+      <section class="analysis-container">
+        <h1>📊 Data Visualization</h1>
+        <p class="subtitle">
+          Upload an Excel or CSV file to start exploring your data.
+        </p>
+
+        <!-- File Upload Box -->
+        <div class="upload-box" id="uploadBox">
+          <input
+            type="file"
+            id="fileInput"
+            accept=".xlsx, .xls, .csv"
+            hidden
+          />
+          <label for="fileInput" class="upload-label">
+            <i class="fa-solid fa-file-excel"></i>
+            <span>Select File</span>
+          </label>
+          <p class="hint">Supported formats: .xlsx, .xls, .csv</p>
+        </div>
+
+        <!-- Display Area -->
+        <div class="file-preview hidden" id="filePreview">
+
+          <p id="emptyMessage" class="hidden" style="color:red; font-weight:600;"></p>
+
+          <h2>File Selected:</h2>
+          <p id="fileName"></p>
+          <div id="sheetSelector" class="hidden">
+            <label for="sheetSelect">Choose Sheet:</label>
+            <select id="sheetSelect"></select>
+          </div>
+          <br>
+          <button class="btn" id="viewBtn">View Data</button>
+        </div>
+
+
+
+        <!-- Placeholder for Table -->
+        <div class="data-view hidden" id="dataView">
+          <h2>📈 Data Preview</h2>
+          <div id="tableContainer" class="table-container"></div>
+        </div>
+
+        <!-- Chart Section -->
+         <div class="chart-section hidden" id="chartSection"> 
+          <h2>📉 Visualize Columns</h2> 
+          <div class="chart-controls"> 
+            <label for="xSelect">X-axis:</label> 
+            <select id="xSelect"></select> 
+            
+            <label for="ySelect">Y-axis:</label> 
+            <select id="ySelect"></select> 
+            
+            <label for="chartTypeSelect">Chart Type:</label> 
+            <select id="chartTypeSelect"> 
+              <option value="scatter">Scatter</option> 
+              <option value="bar">Bar</option> 
+              <option value="line">Line</option> 
+            </select> 
+            
+            <button class="btn" id="plotBtn">Plot Chart</button> 
+          </div> 
+          
+          <canvas id="dataChart" width="600" height="300"></canvas> 
+        
+        </div>
+
+
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+
+  
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+
+
+    
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const filePreview = document.getElementById("filePreview");
+      const fileName = document.getElementById("fileName");
+      const dataView = document.getElementById("dataView");
+      const viewBtn = document.getElementById("viewBtn");
+      const tableContainer = document.getElementById("tableContainer");
+      const chartSection = document.getElementById("chartSection");
+      const xSelect = document.getElementById("xSelect");
+      const ySelect = document.getElementById("ySelect");
+      const plotBtn = document.getElementById("plotBtn");
+
+      const chartTypeSelect = document.getElementById("chartTypeSelect");
+
+
+
+      let globalData = [];
+      let columns = [];
+
+
+fileInput.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  fileName.textContent = file.name;
+  filePreview.classList.remove("hidden");
+
+  // Reset UI
+  dataView.classList.add("hidden");
+  chartSection.classList.add("hidden");
+  tableContainer.innerHTML = "";
+  xSelect.innerHTML = "";
+  ySelect.innerHTML = "";
+  document.getElementById("sheetSelector").classList.add("hidden");
+
+  if (window.dataChart && window.dataChart instanceof Chart) {
+    window.dataChart.destroy();
+    window.dataChart = null;
+  }
+
+  globalData = [];
+  columns = [];
+
+  // 🆕 Ask backend for sheet names
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch("/get_sheets", {
+    method: "POST",
+    body: formData
+  });
+
+  const result = await res.json();
+
+  if (result.error) {
+    alert(result.error);
+    return;
+  }
+
+  if (result.sheets && result.sheets.length > 1) {
+    // Show dropdown
+    const sheetSelect = document.getElementById("sheetSelect");
+    sheetSelect.innerHTML = result.sheets.map(
+      s => `<option value="${s}">${s}</option>`
+    ).join("");
+    document.getElementById("sheetSelector").classList.remove("hidden");
+  }
+});
+
+
+
+viewBtn.addEventListener("click", async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // 🧩 If multiple sheets, include the selected one
+  const sheetSelector = document.getElementById("sheetSelector");
+  if (!sheetSelector.classList.contains("hidden")) {
+    const selectedSheet = document.getElementById("sheetSelect").value;
+    formData.append("sheet_name", selectedSheet);
+  }
+
+  // 🧩 Send file (+ optional sheet) to backend
+  const response = await fetch("/upload_data", {
+    method: "POST",
+    body: formData
+  });
+
+  const result = await response.json();
+
+  if (result.error) {
+    tableContainer.innerHTML = `<p style="color:red;">${result.error}</p>`;
+    return;
+  }
+
+
+  // 🆕 Check if sheet is empty
+  if (!result.preview || result.preview.length === 0) {
+    const selectedSheet =
+      document.getElementById("sheetSelector").classList.contains("hidden")
+        ? "(Default Sheet)"
+        : document.getElementById("sheetSelect").value;
+
+    // Show message OUTSIDE hidden areas
+    const emptyMessage = document.getElementById("emptyMessage");
+    emptyMessage.textContent = `This sheet "${selectedSheet}" is empty.`;
+    emptyMessage.classList.remove("hidden");
+
+    // Hide sections
+    dataView.classList.add("hidden");
+    chartSection.classList.add("hidden");
+
+    // Clear table & chart container
+    tableContainer.innerHTML = "";
+
+    // Reset global values
+    globalData = [];
+    columns = [];
+
+    return; // Stop execution
+  }
+
+
+
+  document.getElementById("emptyMessage").classList.add("hidden");
+
+  // Store data globally
+  globalData = result.preview;
+  columns = result.columns;
+
+  // Build HTML table for preview
+  const headers = result.columns.map(c => `<th>${c}</th>`).join("");
+  const rows = result.preview.map(row =>
+    `<tr>${result.columns.map(c => `<td>${row[c] ?? ""}</td>`).join("")}</tr>`
+  ).join("");
+
+  tableContainer.innerHTML = `
+    <table border="1" cellpadding="6">
+      <thead><tr>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  // Fill dropdowns with columns
+  xSelect.innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join("");
+  ySelect.innerHTML = columns.map(c => `<option value="${c}">${c}</option>`).join("");
+
+  //filePreview.classList.add("hidden");
+  dataView.classList.remove("hidden");
+  chartSection.classList.remove("hidden");
+});
+
+
+
+
+plotBtn.addEventListener("click", () => {
+  let xCol = xSelect.value;
+  let yCol = ySelect.value;
+
+  // Remove old chart
+  if (window.dataChart && window.dataChart instanceof Chart) {
+    window.dataChart.destroy();
+  }
+
+  // Get selected chart type from dropdown
+  let selectedType = chartTypeSelect.value; // "scatter", "bar", "line"
+
+  const xNumeric = isNumericColumn(xCol);
+  const yNumeric = isNumericColumn(yCol);
+
+  let labels = [];
+  let dataPoints = [];
+
+  // Swap axes if needed so categorical column is always x-axis
+  if (xNumeric && !yNumeric) {
+    [xCol, yCol] = [yCol, xCol];
+  }
+
+  const newXNumeric = isNumericColumn(xCol);
+  const newYNumeric = isNumericColumn(yCol);
+
+  if (!newXNumeric && newYNumeric) {
+    // Categorical x, numeric y → bar chart (ignore selectedType for now if not suitable)
+    labels = [];
+    const counts = {};
+    globalData.forEach(row => {
+      const key = row[xCol] ?? "N/A";
+      const val = parseFloat(row[yCol]);
+      if (!isNaN(val)) {
+        counts[key] = (counts[key] || 0) + val;
+      }
+    });
+    labels = Object.keys(counts);
+    dataPoints = Object.values(counts);
+    if (selectedType !== "bar") selectedType = "bar"; // force bar for categorical x
+  } else if (newXNumeric && newYNumeric) {
+    // Both numeric → use selected type
+    labels = globalData.map(r => r[xCol]);
+    dataPoints = globalData.map(r => ({ x: r[xCol], y: parseFloat(r[yCol]) }));
+    if (!["scatter", "line"].includes(selectedType)) selectedType = "scatter"; // fallback
+  } else {
+    alert("Cannot plot two categorical columns directly. Please choose one numeric column.");
+    return;
+  }
+
+  const ctx = document.getElementById("dataChart").getContext("2d");
+
+  if (selectedType === "bar") {
+    window.dataChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: `${yCol} vs ${xCol}`,
+          data: dataPoints,
+          backgroundColor: "rgba(75, 192, 192, 0.5)",
+          borderColor: "rgba(75, 192, 192, 1)",
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: xCol } },
+          y: { title: { display: true, text: yCol } }
+        }
+      }
+    });
+  } else if (selectedType === "scatter" || selectedType === "line") {
+    window.dataChart = new Chart(ctx, {
+      type: selectedType,
+      data: {
+        labels: labels,
+        datasets: [{
+          label: `${yCol} vs ${xCol}`,
+          data: dataPoints,
+          borderColor: "rgba(75,192,192,1)",
+          backgroundColor: "rgba(75,192,192,0.4)",
+          fill: false
+        }]
+      },
+      options: {
+        scales: {
+          x: { title: { display: true, text: xCol } },
+          y: { title: { display: true, text: yCol } }
+        }
+      }
+    });
+  }
+});
+
+
+
+
+      function isNumericColumn(col) {
+        // Find first non-null value
+        const firstNonNull = globalData.find(row => row[col] != null)?.[col];
+        if (firstNonNull === undefined) return false;
+        return !isNaN(parseFloat(firstNonNull)) && isFinite(firstNonNull);
+      }
+
+
+
+
+    </script>
+  </body>
+</html>

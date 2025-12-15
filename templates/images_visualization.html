@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Visualization</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+
+  <body>
+    {% include 'navbar_private.html' %}
+
+    <main>
+      <section class="analysis-container">
+        <h1>🩻 Image Viewer</h1>
+        <p class="subtitle">
+          Upload Medical Images to Preview and Visualize slices.
+        </p>
+
+        <!-- Upload Box -->
+        <div class="upload-box" id="imageUploadBox">
+          <input
+            type="file"
+            id="fileInput"
+            accept=".dcm, .mha, .nii, .nii.gz"
+            hidden
+          />
+          <label for="fileInput" class="upload-label">
+            <i class="fa-solid fa-file-medical"></i>
+            <span>Select File</span>
+          </label>
+          <p class="hint">Supported format: .dcm | .mha | .nii.gz </p>
+        </div>
+
+
+        <div class="file-preview hidden" id="filePreview">
+          <!-- Message to show the uploaded file name -->
+          <p id="uploadedMessage" style="font-weight:600; color:#004085;"></p>
+          
+          
+          <div id="columnSelector" class="hidden">
+            
+            <button id="displayImage" class="btn">Display Image</button>
+          </div>
+
+        </div>
+
+
+
+        <!-- 3 Views Display -->
+
+        <div class="view-container hidden" id="viewingBoxes">
+            <div class="view-box">
+                <h3>Axial View</h3>
+                <img id="axialCanvas" class="view-img">
+                <div class="controls">
+                    <button onclick="changeSlice('axial', -1)"><<<</button>
+                    <button onclick="changeSlice('axial', 1)">>>></button>
+                    <span id="axialIndex"></span>
+                </div>
+            </div>
+
+            <div class="view-box">
+                <h3>Sagittal View</h3>
+                <img id="sagittalCanvas" class="view-img">
+                <div class="controls">
+                    <button onclick="changeSlice('sagittal', -1)"><<<</button>
+                    <button onclick="changeSlice('sagittal', 1)">>>></button>
+                    <span id="sagittalIndex"></span>
+                </div>
+            </div>
+
+            <div class="view-box">
+                <h3>Coronal View</h3>
+                <img id="coronalCanvas" class="view-img">
+                <div class="controls">
+                    <button onclick="changeSlice('coronal', -1)"><<<</button>
+                    <button onclick="changeSlice('coronal', 1)">>>></button>
+                    <span id="coronalIndex"></span>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div id="volume3D" style="width:600px; height:600px; margin-top:20px;"></div>
+
+        
+        
+
+
+
+      </section>
+    </main>
+
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+
+    <!-- Load JS Files for the Statistics Module-->
+    <script src="/static/js/images/visualization.js"></script>
+    <script type="module" src="/static/firebase-config.js"></script>
+    
+
+
+  </body>
+</html>
