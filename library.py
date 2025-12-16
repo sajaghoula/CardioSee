@@ -59,8 +59,9 @@ def library_data():
 @lib_bp.route("/load_image_by_name", methods=["GET"])
 def load_image_by_name():
     filename = request.args.get("file")
-    
-    full_path = f"/home/saja/CardioSee/images/download/{filename}"
+
+    full_path = os.path.join(IMAGE_FOLDER, filename)
+
 
     if not os.path.exists(full_path):
         return jsonify({"error": "File not found"}), 400
@@ -98,7 +99,8 @@ def get_slice_2():
     if not view or not index or not filename:
         return jsonify({"error": "Missing parameters"}), 400
 
-    full_path = f"/home/saja/CardioSee/images/download/{filename}"
+    full_path = os.path.join(IMAGE_FOLDER, filename)
+
     if not os.path.exists(full_path):
         return jsonify({"error": f"File not found: {filename}"}), 400
 
@@ -168,7 +170,8 @@ def delete_image():
 @lib_bp.route("/load_volume_3d", methods=["GET"])
 def load_volume_3d():
     filename = request.args.get("file")
-    full_path = f"/home/saja/CardioSee/images/download/{filename}"
+
+    full_path = os.path.join(IMAGE_FOLDER, filename)
 
     if not os.path.exists(full_path):
         return jsonify({"error": "File not found"}), 400

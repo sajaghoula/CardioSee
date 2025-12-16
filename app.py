@@ -147,6 +147,13 @@ def images_visualization():
     return render_template("images_visualization.html")
 
 
+@app.route("/settings")
+@auth_required
+def settings():
+    return render_template("settings.html")
+
+
+
 
 @app.route("/library")
 @auth_required
@@ -156,4 +163,5 @@ def library():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    #app.run(debug=True)
+    app.run()
