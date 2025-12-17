@@ -19,22 +19,8 @@ Before you begin, ensure you have the following installed:
 - Python 3.8 or later
 - pip (Python package installer)
 
-## Getting Started
 
-To get a local copy up and running follow these simple steps.
 
-Youtube Tutorial Link: https://youtu.be/HoRutj1z3fQ?si=AqlPrnqYYt90DdKf
-
-### 1. Clone the repository
-
-git clone https://github.com/adjdunn/simple_firebase_app
-cd flask-firebase-auth-template
-
-### 2. Install dependencies
-
-pip install -r requirements.txt
-
-### 3. Configuration
 
 #### Firebase Setup 
 - Create Firebase account (https://firebase.google.com/)
@@ -49,45 +35,6 @@ pip install -r requirements.txt
 - Place the downloaded JSON file in your project directory and rename it to firebase-auth.json.
 - Navigate to "Buid" > "Authentication" section > click "Sign-in Method" and enable sign-in for Email/Password and Google options.
 - Inside the "Autentication" section > click "Settings" > "Authorized Domains" and add your website domain to allow it to use the Google sign pop up in (localhost is authorized by default).
-
-#### Environment Variables
-Create a .env file in the root directory of the project and add the following environment variables:
-
-SECRET_KEY=add_your_secret_key_here
-
-
-### 4. Run the application
-
-python app.py
-
-This will start the Flask application on http://localhost:5000 by default.
-
-### 5. Customize the template to build your own app.
-
-To add private pages (requiring authentication to view) add the @auth_required decorator to the route. 
-
-Example:
-
-@app.route('/dashboard')
-@auth_required
-def dashboard():
-    return "This is a private page that requires authentication to view"
-
-
-
-## Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
-
-Fork the Project
-Create your Feature Branch (git checkout -b feature/AmazingFeature)
-Commit your Changes (git commit -m 'Add some AmazingFeature')
-Push to the Branch (git push origin feature/AmazingFeature)
-Open a Pull Request
-
-## License
-Distributed under the MIT License. 
-
 
 
 ## Acknowledgements
