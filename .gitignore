@@ -23,3 +23,24 @@ images/
 firebase-auth.json
 .env
 
+# Virtual environments
+venv/
+venv_render_test/
+.env
+__pycache__/
+*.pyc
+
+# Firebase credentials
+firebase-auth.json
+
+# OS files
+.DS_Store
+# Virtual environments
+venv/
+venv_render_test/
+.env
+__pycache__/
+*.pyc
+
+# Firebase credentials
+firebase-auth.json

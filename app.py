@@ -26,14 +26,9 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Can be 'Strict', 'Lax', or 'Non
 
 
 # Firebase Admin SDK setup
-if os.environ.get("FIREBASE_PROJECT_ID"):
+if os.environ.get("RENDER") == "true":
     # 🔐 Production (Render)
-    cred = credentials.Certificate({
-        "type": "service_account",
-        "project_id": os.environ["FIREBASE_PROJECT_ID"],
-        "private_key": os.environ["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
-        "client_email": os.environ["FIREBASE_CLIENT_EMAIL"],
-    })
+    cred = credentials.Certificate("firebase-auth.json")
 else:
     # 🧪 Local development
     cred = credentials.Certificate("firebase-auth.json")
