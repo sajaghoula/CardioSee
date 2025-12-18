@@ -46,19 +46,6 @@ if (forgotPasswordButtonEl) {
 
 /* === Main Code === */
 
-document.addEventListener("DOMContentLoaded", () => {
-  const loginBtn = document.getElementById("sign-in-btn");
-
-  loginBtn.addEventListener("click", () => {
-    const email = document.getElementById("email-input").value;
-    const password = document.getElementById("password-input").value;
-
-    loginUser(email, password); // call Firebase login function
-  });
-});
-
-
-
 /* = Functions - Firebase - Authentication = */
 
 // Function to sign in with Google authentication
@@ -213,34 +200,24 @@ function resetPassword() {
 
 
 
-async function loginUser(email, password) {
-
-
-    console.log(typeof email, email);
-
-    // 🔴 ONLY ONE Firebase login
-    const userCredential =
-      await signInWithEmailAndPassword(auth, email, password);
-
-    console.log("User signed in:", userCredential.user);
-
-    // ✅ Get token from THIS user
-    const token = await userCredential.user.getIdToken();
-
-    // ✅ Send token to backend ONCE
-    const res = await fetch("/auth", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
+function loginUser(user, idToken) {
+    fetch('/auth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+        },
+        credentials: 'same-origin'  // Ensures cookies are sent with the request
+    }).then(response => {
+        if (response.ok) {
+            window.location.href = '/dashboard';
+        } else {
+            console.error('Failed to login');
+            // Handle errors here
+        }
+    }).catch(error => {
+        console.error('Error with Fetch operation: ', error);
     });
-
-    if (!res.ok) {
-      throw new Error("Backend auth failed");
-    }
-
-    console.log("Backend auth OK");
-
 }
 
 
