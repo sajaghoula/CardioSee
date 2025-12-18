@@ -213,26 +213,32 @@ function resetPassword() {
 
 
 
-function loginUser(user, idToken) {
-    fetch('/auth', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-        },
-        credentials: 'same-origin'  // Ensures cookies are sent with the request
-    }).then(response => {
-        if (response.ok) {
-            window.location.href = '/dashboard';
-        } else {
-            console.error('Failed to login');
-            // Handle errors here
-        }
-    }).catch(error => {
-        console.error('Error with Fetch operation: ', error);
-    });
-}
+async function loginUser(email, password) {
+  try {
+    const userCredential =
+      await signInWithEmailAndPassword(auth, email, password);
 
+    const user = userCredential.user;
+    const token = await user.getIdToken(); // ALWAYS this
+
+    const res = await fetch("/auth", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error("Backend auth failed");
+    }
+
+    console.log("Login OK");
+  } catch (error) {
+    console.error("Login error:", error.code);
+    // ❗ DO NOT call fetch here
+  }
+}
 
 
 // /* = Functions - UI = */
