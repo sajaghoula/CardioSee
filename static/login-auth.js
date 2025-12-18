@@ -46,6 +46,10 @@ if (forgotPasswordButtonEl) {
 
 /* === Main Code === */
 
+
+
+
+
 /* = Functions - Firebase - Authentication = */
 
 // Function to sign in with Google authentication

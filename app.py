@@ -10,7 +10,6 @@ from data_routes import data_bp
 from images_vi import image_bp
 from library import lib_bp
 from flask_cors import CORS
-
 load_dotenv()
 
 
@@ -19,8 +18,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-123')
 
-CORS(app, supports_credentials=True, origins=["https://cardiosee.onrender.com", "http://localhost:5000"])
-
+CORS(app, supports_credentials=True, origins=["*" ])
 
 # Configure session cookie settings
 app.config['SESSION_COOKIE_SECURE'] = True  # Ensure cookies are sent over HTTPS
@@ -52,7 +50,6 @@ if not firebase_admin._apps:
         cred = credentials.Certificate("firebase-auth.json")
 
 firebase_admin.initialize_app(cred)
-
 db = firestore.client()
 
 
@@ -85,112 +82,20 @@ def auth_required(f):
 
 @app.route('/auth', methods=['POST'])
 def authorize():
-    import traceback
-    from flask import request
-    
-    # Get request info
-    token = request.headers.get('Authorization', '')
-    origin = request.headers.get('Origin', '')
-    host = request.headers.get('Host', '')
-    
-    print(f"\n=== AUTH ATTEMPT ===")
-    print(f"Origin: {origin}")
-    print(f"Host: {host}")
-    print(f"Token provided: {'YES' if token else 'NO'}")
-    
-    if token and token.startswith('Bearer '):
-        token = token[7:]
-        print(f"Token length: {len(token)} chars")
-        print(f"Token starts with: {token[:50]}...")
-    
+    token = request.headers.get('Authorization')
     if not token or not token.startswith('Bearer '):
-        print("ERROR: No Bearer token in header")
-        return jsonify({"error": "No Bearer token provided"}), 401
-    
-    token = token[7:]
-    
+        return "Unauthorized", 401
+
+    token = token[7:]  # Strip off 'Bearer ' to get the actual token
+
     try:
-        # Try without revocation check first
-        decoded_token = auth.verify_id_token(token, check_revoked=False, clock_skew_seconds=300)
-        print(f"✅ Token VERIFIED")
-        print(f"   User UID: {decoded_token.get('uid')}")
-        print(f"   User email: {decoded_token.get('email')}")
-        print(f"   Audience (project): {decoded_token.get('aud')}")
-        print(f"   Issuer: {decoded_token.get('iss')}")
-        print(f"   Expires: {decoded_token.get('exp')}")
-        
-        # Now check if revoked
-        try:
-            auth.check_revoked(decoded_token)
-            print("✅ Token NOT revoked")
-            
-            # Store in session
-            session['user'] = decoded_token
-            
-            return jsonify({
-                "success": True,
-                "user": {
-                    "uid": decoded_token.get('uid'),
-                    "email": decoded_token.get('email')
-                }
-            })
-            
-        except auth.RevokedIdTokenError as e:
-            print(f"❌ Token REVOKED: {e}")
-            return jsonify({"error": "Token revoked. Please log in again."}), 401
-            
-    except auth.InvalidIdTokenError as e:
-        print(f"❌ INVALID TOKEN ERROR: {e}")
-        print(f"   Error type: {type(e).__name__}")
-        return jsonify({"error": f"Invalid token: {str(e)}"}), 401
-    except auth.ExpiredIdTokenError as e:
-        print(f"❌ EXPIRED TOKEN: {e}")
-        return jsonify({"error": "Token expired. Please refresh."}), 401
-    except Exception as e:
-        print(f"❌ UNEXPECTED ERROR: {type(e).__name__}: {e}")
-        print("Traceback:")
-        traceback.print_exc()
-        return jsonify({"error": f"Authentication failed: {type(e).__name__}: {str(e)}"}), 401
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.route('/test-firebase')
-def test_firebase():
-    import os, json, firebase_admin
-    from firebase_admin import credentials
+        decoded_token = auth.verify_id_token(token, check_revoked=True, clock_skew_seconds=60) # Validate token here
+        session['user'] = decoded_token # Add user to session
+        return redirect(url_for('dashboard'))
     
-    result = {
-        "firebase_initialized": len(firebase_admin._apps) > 0,
-        "current_directory": os.getcwd(),
-        "files": os.listdir('.'),
-        "firebase_auth_exists": os.path.exists('firebase-auth.json'),
-        "service_account_info": None
-    }
-    
-    if result['firebase_auth_exists']:
-        try:
-            with open('firebase-auth.json', 'r') as f:
-                data = json.load(f)
-                result['service_account_info'] = {
-                    "project_id": data.get('project_id'),
-                    "client_email": data.get('client_email'),
-                    "private_key_exists": bool(data.get('private_key'))
-                }
-        except Exception as e:
-            result['file_error'] = str(e)
-    
-    return jsonify(result)
+    except:
+        return "Unauthorized", 401
+
 
 #####################
 """ Public Routes """
@@ -264,6 +169,12 @@ def images_visualization():
     return render_template("images_visualization.html")
 
 
+
+@app.route("/library")
+@auth_required
+def library():
+    return render_template("library.html")
+
 @app.route("/settings")
 @auth_required
 def settings():
@@ -271,14 +182,5 @@ def settings():
 
 
 
-
-@app.route("/library")
-@auth_required
-def library():
-    return render_template("library.html")
-
-
-
 if __name__ == '__main__':
-    #app.run(debug=True)
-    app.run()
+    app.run(debug=True)
