@@ -214,18 +214,24 @@ function resetPassword() {
 
 
 async function loginUser(email, password) {
-  try {
+
+
+    console.log(typeof email, email);
+
+    // 🔴 ONLY ONE Firebase login
     const userCredential =
       await signInWithEmailAndPassword(auth, email, password);
 
-    const user = userCredential.user;
-    const token = await user.getIdToken(); // ALWAYS this
+    console.log("User signed in:", userCredential.user);
 
+    // ✅ Get token from THIS user
+    const token = await userCredential.user.getIdToken();
+
+    // ✅ Send token to backend ONCE
     const res = await fetch("/auth", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Authorization": `Bearer ${token}`
       }
     });
 
@@ -233,12 +239,10 @@ async function loginUser(email, password) {
       throw new Error("Backend auth failed");
     }
 
-    console.log("Login OK");
-  } catch (error) {
-    console.error("Login error:", error.code);
-    // ❗ DO NOT call fetch here
-  }
+    console.log("Backend auth OK");
+
 }
+
 
 
 // /* = Functions - UI = */
