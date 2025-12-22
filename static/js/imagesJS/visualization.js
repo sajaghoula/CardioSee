@@ -63,7 +63,7 @@ displayImageBtn.addEventListener("click", async () => {
 
     console.log(factorX, factorY, factorZ) //320 320 1
 
-    render3D(volume3D, { x: factorX, y: factorY, z: factorZ });
+    //render3D(volume3D, { x: factorX, y: factorY, z: factorZ });
 
 });
 
@@ -147,5 +147,4 @@ function render3D(volume, scale) {
         margin: { l: 0, r: 0, b: 0, t: 0 }
     };
 
-    Plotly.newPlot('volume3D', [trace], layout);
 }

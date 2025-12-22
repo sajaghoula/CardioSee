@@ -10,6 +10,9 @@ from data_routes import data_bp
 from images_vi import image_bp
 from library import lib_bp
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
+
+
 load_dotenv()
 
 
@@ -26,6 +29,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to coo
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Adjust session expiration as needed
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Can be 'Strict', 'Lax', or 'None'
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
 
 # Firebase Admin SDK setup
@@ -181,6 +185,12 @@ def settings():
     return render_template("settings.html")
 
 
+@app.errorhandler(RequestEntityTooLarge)
+def handle_large_file(e):
+    return jsonify({"error": "File too large"}), 413
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+

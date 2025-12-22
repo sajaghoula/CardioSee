@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify
 from skimage.measure import shannon_entropy
 from scipy.stats import skew, kurtosis
-import plotly.graph_objects as go
 from skimage.filters import sobel
 from skimage import measure
 import SimpleITK as sitk
