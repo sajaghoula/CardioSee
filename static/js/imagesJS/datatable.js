@@ -1,6 +1,6 @@
 // Render table
 let currentPage = 1;
-const rowsPerPage = 5;
+const rowsPerPage = 10;
 let filteredRows = []; // store rows after search
 
 // Sorting
@@ -27,8 +27,15 @@ async function loadLibraryTable() {
         createdAt: item.createdAt || "-", 
         quality: item.quality  || "-", 
         geometry: item.geometry  || "-", 
-        stats: item.stats  || "-", 
+        stats: item.stats  || "-",
+        median: item.median ?? "-",
+        dark: item.dark ?? "-",
+        dominant_tissue: item.dominant_tissue || "-",
+        physical_size: item.physical_size ?? "-",
+        volume_cm3: item.volume_cm3 ?? "-",
+        cardio: item.cardio ?? "-",
     }));
+
 
     filteredRows = window.tableRows; // initially no filter
     currentPage = 1;
@@ -48,8 +55,14 @@ function renderTable(rows) {
         tr.innerHTML = `
             <td>${row.name}</td>
             <td>${row.filetype}</td>
-            <td>${row.createdBy}</td>
-            <td>${row.createdAt}</td>
+            <td>${row.dominant_tissue}</td>
+            <td>${row.median}</td>
+            <td>${row.physical_size}</td>
+            <td>${row.volume_cm3}</td>
+            <td>${row.dark}</td>
+            <td>${row.cardio}</td>
+
+
             <td>
 
               <button class="btn-small" onclick="viewInfo('${row.id}')" title="Info">
@@ -134,7 +147,9 @@ searchInput.addEventListener("input", () => {
     filteredRows = window.tableRows.filter(row => 
         row.name.toLowerCase().includes(term) ||
         row.filetype.toLowerCase().includes(term) ||
-        row.createdBy.toLowerCase().includes(term)
+        row.createdBy.toLowerCase().includes(term) ||
+        row.dominant_tissue.toLowerCase().includes(term)
+        
     );
 
     currentPage = 1; // reset to first page after search
@@ -155,18 +170,30 @@ document.querySelectorAll("th[data-sort]").forEach(header => {
             let x = a[key];
             let y = b[key];
 
-            // For dates
+            // Handle missing values
+            if (x === "-" || x === null || x === undefined) return 1;
+            if (y === "-" || y === null || y === undefined) return -1;
+
+            // Date sorting
             if (key === "createdAt") {
                 x = new Date(x);
                 y = new Date(y);
                 return direction === "asc" ? x - y : y - x;
             }
 
-            // For strings
+            // Numeric sorting
+            if (!isNaN(x) && !isNaN(y)) {
+                return direction === "asc"
+                    ? Number(x) - Number(y)
+                    : Number(y) - Number(x);
+            }
+
+            // String sorting (fallback)
             return direction === "asc"
                 ? x.toString().localeCompare(y.toString())
                 : y.toString().localeCompare(x.toString());
         });
+
 
         currentPage = 1; // reset to first page after sort
         renderTable();
@@ -178,14 +205,6 @@ document.querySelectorAll("th[data-sort]").forEach(header => {
 function viewInfo(imageId) {
     const row = window.tableRows.find(r => r.id === imageId);
     if (!row) return;
-
-    // ---- Overview ----
-    /*document.getElementById("overviewContent").innerHTML = `
-        <p><strong>Filename:</strong> ${row.name}</p>
-        <p><strong>File Type:</strong> ${row.filetype}</p>
-        <p><strong>Uploaded By:</strong> ${row.createdBy}</p>
-        <p><strong>Date:</strong> ${row.createdAt}</p>
-    `;*/
 
 
 
@@ -576,47 +595,7 @@ async function render3D(volumeData) {
         scene.add(plane);
     }
     
-    // METHOD 2: Alternative - Point cloud rendering for sparse data
-    // If you want point cloud instead, uncomment this section
-    /*
-    const points = new THREE.BufferGeometry();
-    const positions = [];
-    const colors = [];
-    const pointCount = 50000; // Limit points for performance
-    
-    for (let i = 0; i < pointCount; i++) {
-        const index = Math.floor(Math.random() * data.length);
-        const z = Math.floor(index / (shape[1] * shape[2]));
-        const y = Math.floor((index % (shape[1] * shape[2])) / shape[2]);
-        const x = index % shape[2];
-        
-        const value = data[index];
-        if (value > min + (max - min) * 0.3) { // Only show values above threshold
-            positions.push(
-                (x / shape[2]) - 0.5,
-                (y / shape[1]) - 0.5,
-                (z / shape[0]) - 0.5
-            );
-            
-            const normalized = (value - min) / (max - min);
-            colors.push(normalized, normalized, 1.0); // Blue-ish color
-        }
-    }
-    
-    points.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    points.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    
-    const pointMaterial = new THREE.PointsMaterial({
-        size: 0.002,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.5
-    });
-    
-    const pointCloud = new THREE.Points(points, pointMaterial);
-    scene.add(pointCloud);
-    */
-    
+
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);

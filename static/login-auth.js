@@ -121,11 +121,16 @@ function authSignInWithEmail() {
 
     signInWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
-            // Signed in 
             const user = userCredential.user;
 
+            // Get token (wait for Promise)
             user.getIdToken().then(function(idToken) {
-                loginUser(user, idToken)
+                // ✅ idToken is a string now
+                document.cookie = `idToken=${idToken}; path=/`;
+                document.cookie = `userEmail=${user.email}; path=/`;
+
+                // Optional: call loginUser with token
+                loginUser(user, idToken);
             });
 
             console.log("User signed in: ", user)
@@ -139,6 +144,7 @@ function authSignInWithEmail() {
                 errorMsgPassword.textContent = "Login failed - invalid email or password"
             } 
         });
+
 }
 
 

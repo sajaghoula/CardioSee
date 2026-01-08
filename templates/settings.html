@@ -20,6 +20,36 @@
 
     <main>
       <section class="analysis-container">
+        <div class="datatable-container">
+  <h2>System Variables</h2>
+  <table id="systemVariablesTable">
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Value</th>
+        <th>Description</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Rows will be dynamically injected from Firebase -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Update Popup -->
+<div id="updatePopup" class="popup-overlay">
+  <div class="popup-content">
+    <h3>Update Variable</h3>
+    <p id="variableName"></p>
+    <input type="text" id="variableValue" placeholder="Enter new value">
+    <div class="popup-buttons">
+      <button id="cancelBtn">Cancel</button>
+      <button id="updateBtn">Update</button>
+    </div>
+  </div>
+</div>
+
 
 
 
@@ -31,3 +61,278 @@
 
   </body>
 </html>
+
+
+
+
+
+
+
+
+<script type="module">
+const tableBody = document.querySelector('#systemVariablesTable tbody');
+const popup = document.getElementById('updatePopup');
+const variableNameEl = document.getElementById('variableName');
+const variableValueInput = document.getElementById('variableValue');
+let currentDocId = null;
+let currentVariableName = null;
+
+// Load system variables from Flask API
+async function loadSystemVariables() {
+    try {
+        tableBody.innerHTML = '<tr><td colspan="4">Loading...</td></tr>';
+        
+        // Fetch from your Flask API endpoint
+        const response = await fetch('/get_system_variables');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const variables = await response.json();
+        
+        if (!Array.isArray(variables) || variables.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4">No system variables found</td></tr>';
+            return;
+        }
+        
+        tableBody.innerHTML = '';
+        
+        // Assuming your documents have an 'id' field or using index as temporary ID
+        variables.forEach((variable, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${variable.variable || 'N/A'}</td>
+                <td>${variable.value || 'N/A'}</td>
+                <td>${variable.description || ''}</td>
+                <td>
+                    <button class="action-btn" 
+                            data-id="${variable.id || index}"
+                            data-variable="${variable.variable || ''}"
+                            data-value="${variable.value || ''}"
+                            data-description="${variable.description || ''}">
+                        Update
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        // Add event listeners to buttons
+        document.querySelectorAll('.action-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const btn = e.target;
+                openPopup(
+                    btn.dataset.id,
+                    btn.dataset.variable,
+                    btn.dataset.value,
+                    btn.dataset.description
+                );
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error loading system variables:', error);
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4" style="color: red; text-align: center; padding: 20px;">
+                    <strong>Error loading system variables:</strong><br>
+                    ${error.message}<br>
+                    <small>Check console for details</small>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// Open popup
+function openPopup(id, variable, value, description) {
+    currentDocId = id;
+    currentVariableName = variable;
+    variableNameEl.textContent = variable;
+    variableValueInput.value = value;
+    popup.style.display = 'flex';
+    
+    // Optional: Show description if you have a field for it
+    if (description) {
+        const descriptionEl = document.getElementById('variableDescription') || 
+                              (() => {
+                                  const el = document.createElement('p');
+                                  el.id = 'variableDescription';
+                                  el.style.fontSize = '0.9em';
+                                  el.style.color = '#666';
+                                  variableNameEl.parentNode.insertBefore(el, variableNameEl.nextSibling);
+                                  return el;
+                              })();
+        descriptionEl.textContent = `Description: ${description}`;
+    }
+}
+
+// Close popup
+document.getElementById('cancelBtn').addEventListener('click', () => {
+    popup.style.display = 'none';
+    // Clear the description element if it exists
+    const descEl = document.getElementById('variableDescription');
+    if (descEl) descEl.remove();
+});
+
+// Update variable - You'll need a Flask endpoint for this too
+document.getElementById('updateBtn').addEventListener('click', async () => {
+    if (!currentDocId || !currentVariableName) return;
+    
+    const newValue = variableValueInput.value.trim();
+    if (!newValue) {
+        alert('Please enter a value');
+        return;
+    }
+    
+    try {
+        // First, check if you have an update endpoint
+        // If not, we'll need to create one in Flask
+        const response = await fetch('/update_system_variable', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                variable: currentVariableName,
+                value: newValue
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Update failed with status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        popup.style.display = 'none';
+        alert(result.message || 'Updated successfully!');
+        
+        // Clear the description element
+        const descEl = document.getElementById('variableDescription');
+        if (descEl) descEl.remove();
+        
+        // Reload the data
+        await loadSystemVariables();
+        
+    } catch (error) {
+        console.error('Error updating variable:', error);
+        alert(`Update failed: ${error.message}`);
+    }
+});
+
+// Initial load
+document.addEventListener('DOMContentLoaded', loadSystemVariables);
+</script>
+
+
+
+
+
+
+
+
+<style>
+  .datatable-container {
+  background: var(--primary-color);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.datatable-container h2 {
+  color: var(--accent-color);
+  margin-bottom: 1rem;
+}
+
+#systemVariablesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-main);
+}
+
+#systemVariablesTable th,
+#systemVariablesTable td {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-color);
+}
+
+#systemVariablesTable th {
+  background-color: var(--accent-light);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+#systemVariablesTable tr:hover {
+  background-color: var(--border-color);
+}
+
+.action-btn {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  padding: 0.3rem 0.6rem;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.action-btn:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* Popup */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.popup-content {
+  background: var(--primary-color);
+  padding: 2rem;
+  border-radius: var(--radius);
+  width: 300px;
+  text-align: center;
+  box-shadow: var(--shadow-soft);
+}
+
+.popup-content input {
+  width: 100%;
+  padding: 0.5rem;
+  margin: 1rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+}
+
+.popup-buttons button {
+  margin: 0 0.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+}
+
+#cancelBtn {
+  background: var(--text-light);
+  color: var(--primary-color);
+}
+
+#updateBtn {
+  background: var(--accent-color);
+  color: var(--primary-color);
+}
+
+</style>

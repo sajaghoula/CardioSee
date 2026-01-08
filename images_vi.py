@@ -24,6 +24,7 @@ image_bp = Blueprint('image_bp', __name__)
 
 # Store the loaded volume in memory (for simplicity)
 volume_store = {}
+z_threshold = 300
 
 
 @image_bp.route('/upload_image', methods=['POST'])
@@ -309,6 +310,7 @@ def prepare_mha(file):
 
 def extract_image_info(file):
     filename = file.filename.lower()
+    spacing = 0
 
     info = {
         "image_type": None,
@@ -353,10 +355,11 @@ def extract_image_info(file):
         vol = sitk.GetArrayFromImage(img).astype(np.float32)
 
         info["image_type"] = "MHA"
+        spacing = img.GetSpacing()
 
         # Metadata
         info["metadata"] = {
-            "spacing": img.GetSpacing(),
+            "spacing": spacing,
             "origin": img.GetOrigin(),
             "direction": img.GetDirection()
         }
@@ -392,9 +395,10 @@ def extract_image_info(file):
     # Statistics
     # ------------------------------
     flat = vol.flatten()
+    shape = vol.shape
 
     info["statistics"] = {
-        "shape": vol.shape,
+        "shape": shape,
         "min": float(np.min(vol)),
         "max": float(np.max(vol)),
         "mean": float(np.mean(vol)),
@@ -411,6 +415,8 @@ def extract_image_info(file):
     # ------------------------------
     coords = np.argwhere(vol > 0)
 
+    size_info = calculate_physical_size(spacing, shape)
+
     info["geometry"] = {
         "bounding_box": None,
         "center_of_mass": None
@@ -422,13 +428,26 @@ def extract_image_info(file):
                 "min": coords.min(axis=0).tolist(),
                 "max": coords.max(axis=0).tolist()
             },
-            "center_of_mass": coords.mean(axis=0).tolist()
+            "center_of_mass": coords.mean(axis=0).tolist(),
+            "physical_size" : size_info["physical_size"],
+            "volume_mm3" : size_info["volume_mm3"],
+            "cardio" : size_info["cardio"],
         }
+
 
     # ------------------------------
     # Quality metrics
     # ------------------------------
+
+    intensity_range = info["statistics"]["max"] - info["statistics"]["min"]
+
     gradient = sobel(vol.astype(np.float64))
+
+
+    dark_info = analyze_image_median(info["statistics"]["median"])
+    
+
+
 
     info["quality"] = {
         "SNR": float(np.mean(flat) / (np.std(flat) + 1e-8)),
@@ -436,7 +455,10 @@ def extract_image_info(file):
         "entropy": float(shannon_entropy(vol)),
         "sharpness": float(np.mean(gradient)),
         "skewness": float(skew(flat)),
-        "kurtosis": float(kurtosis(flat))
+        "kurtosis": float(kurtosis(flat)),
+        "intensity_range" : intensity_range,
+        "dark": dark_info["dark"],               
+        "dominant_tissue": dark_info["dominant_tissue"]
     }
 
     return info
@@ -456,3 +478,70 @@ def save_image_record(db, name, filetype, user):
     })
 
     return image_id
+
+
+def analyze_image_median(median_hu):
+    """
+    Determine if an image is dark and what tissue type dominates based on median HU.
+
+    Parameters:
+        median_hu (float): median intensity of the image in Hounsfield Units (HU)
+
+    Returns:
+        dict: {
+            "dark": 0 or 1,
+            "dominant_tissue": str
+        }
+    """
+    # Determine darkness
+    # Threshold: median < -700 HU considered dark
+    dark = 1 if median_hu < -700 else 0
+
+    # Determine dominant tissue
+    if median_hu < -900:
+        tissue = "Air-dominant"
+    elif -900 <= median_hu < -500:
+        tissue = "Lung"
+    elif -500 <= median_hu < -100:
+        tissue = "Fat / low-density tissue"
+    elif -100 <= median_hu < 0:
+        tissue = "Fat–water transition"
+    elif 0 <= median_hu < 50:
+        tissue = "Soft tissue / water"
+    elif 50 <= median_hu <= 300:
+        tissue = "Dense soft tissue / enhanced structures"
+    else:  # median_hu > 300
+        tissue = "Bone / calcification"
+
+    return {"dark": dark, "dominant_tissue": tissue}
+
+
+def calculate_physical_size(spacing, shape):
+    """
+    Calculate the physical size of a 3D image.
+
+    Parameters:
+        spacing (tuple/list): voxel spacing in mm (x, y, z)
+        shape (tuple/list): volume shape in voxels (z, y, x)
+
+    Returns:
+        tuple: physical size in mm (x_size, y_size, z_size)
+    """
+    # Note: shape order = (z, y, x), spacing order = (x, y, z)
+    size_x = shape[2] * spacing[0]  # x dimension
+    size_y = shape[1] * spacing[1]  # y dimension
+    size_z = shape[0] * spacing[2]  # z dimension
+
+    # Compute total volume
+    volume = size_x * size_y * size_z
+
+    # Classify cardio
+    cardio = 1 if size_z <= z_threshold else 0
+
+    return {
+        "physical_size": (size_x, size_y, size_z),
+        "volume_mm3": volume,
+        "cardio": cardio
+    }
+
+

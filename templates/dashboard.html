@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" >
 
-  <title>Flask Template</title>
+  <title>CardioSee</title>
 
 
   </head>
@@ -17,15 +17,105 @@
 
     {% include 'navbar_private.html' %}
 
-    <main>
+<main class="dashboard-container">
 
-      <h1>Dashboard (Protected Page)</h1>
+  <!-- Page Title -->
+  <section class="dashboard-header">
+    <h1>Dashboard</h1>
+    <p>
+      Overview of medical image analysis results and system-level statistics.
+    </p>
+  </section>
 
-      <p>This is a protected page that requires authenication to view.</p> 
+  <!-- Summary Cards -->
+  <section class="dashboard-summary">
 
-      <p>Use this template to create and customize more protected pages for your app.</p>
+    <div class="summary-card">
+      <div class="card-icon">🖼️</div>
+      <h3>Uploaded Images</h3>
+      <p class="summary-value" id="total-images">0</p>
+      <span class="summary-hint">CT images processed</span>
+    </div>
 
-    </main>
+    <div class="summary-card">
+      <div class="card-icon">🫀</div>
+      <h3>Cardiac Images</h3>
+      <p class="summary-value" id="cardio-images">0%</p>
+      <span class="summary-hint">Predicted cardiac relevance</span>
+    </div>
+
+    <div class="summary-card">
+      <div class="card-icon">🌗</div>
+      <h3>Image Intensity</h3>
+      <p class="summary-value" id="intensity-balance">0%</p>
+      <span class="summary-hint">Dark vs light distribution</span>
+    </div>
+
+    <div class="summary-card">
+      <div class="card-icon">📦</div>
+      <h3>Median Volume</h3>
+      <p class="summary-value" id="median-volume">–</p>
+      <span class="summary-hint">Estimated image volume</span>
+    </div>
+
+  </section>
+
+  <!-- Charts Section -->
+  <section class="dashboard-charts">
+
+    <div class="chart-card">
+      <h2>Image Tissue Distribution</h2>
+      <p class="chart-subtitle">
+        Relative proportions of lung, air, and fat tissue across uploaded CT images.
+      </p>
+      <canvas id="tissuePieChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h2>Prediction-Based Image Classification</h2>
+      <p class="chart-subtitle">
+        Distribution of predicted cardiac versus non-cardiac images.
+      </p>
+      <canvas id="cardioPredictionChart"></canvas>
+    </div>
+
+  </section>
+
+  <!-- Shortcuts -->
+  <section class="dashboard-shortcuts">
+    <h2>Quick Access</h2>
+
+    <div class="shortcuts-grid">
+
+      <a href="/data_visualization" class="shortcut-card">
+        <div class="card-icon">📊</div>
+        <h3>Data Visualization</h3>
+        <p>Explore and plot clinical datasets.</p>
+      </a>
+
+      <a href="/statistics" class="shortcut-card">
+        <div class="card-icon">📈</div>
+        <h3>Statistics</h3>
+        <p>Perform statistical and correlation analysis.</p>
+      </a>
+
+      <a href="/images_visualization" class="shortcut-card">
+        <div class="card-icon">🧠</div>
+        <h3>Image Viewer</h3>
+        <p>Inspect CT images in multiple planes.</p>
+      </a>
+
+      <a href="/library" class="shortcut-card">
+        <div class="card-icon">🗂️</div>
+        <h3>Image Library</h3>
+        <p>Manage and analyze uploaded images.</p>
+      </a>
+
+    </div>
+  </section>
+
+</main>
+
 
     <script src="{{ url_for('static', filename='login-auth.js') }}" type="module"></script>
     <script src="{{ url_for('static', filename='scripts.js') }}" type="module"></script>

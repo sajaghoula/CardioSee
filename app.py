@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 from data_routes import data_bp
 from images_vi import image_bp
 from library import lib_bp
+from settings import settings_bp
+from profile import profile_bp
+
 from flask_cors import CORS
-from werkzeug.exceptions import RequestEntityTooLarge
-
-
 load_dotenv()
 
 
@@ -29,7 +29,6 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to coo
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Adjust session expiration as needed
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Can be 'Strict', 'Lax', or 'None'
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
 
 # Firebase Admin SDK setup
@@ -59,10 +58,12 @@ db = firestore.client()
 
 # Register
 app.register_blueprint(data_bp)
-
 app.register_blueprint(image_bp)
-
 app.register_blueprint(lib_bp)
+app.register_blueprint(settings_bp)
+app.register_blueprint(profile_bp)
+
+
 
 
 
@@ -141,7 +142,7 @@ def privacy():
 @app.route('/logout')
 def logout():
     session.pop('user', None)  # Remove the user from session
-    response = make_response(redirect(url_for('login')))
+    response = make_response(redirect(url_for('home')))
     response.set_cookie('session', '', expires=0)  # Optionally clear the session cookie
     return response
 
@@ -184,13 +185,10 @@ def library():
 def settings():
     return render_template("settings.html")
 
-
-@app.errorhandler(RequestEntityTooLarge)
-def handle_large_file(e):
-    return jsonify({"error": "File too large"}), 413
+@app.route("/profile")
+@auth_required
+def profile():
+    return render_template("profile.html")
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-

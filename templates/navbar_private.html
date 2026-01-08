@@ -4,10 +4,18 @@
     <div class="navbar-right" id="navbarRight">
         <span class="closebtn">&times;</span>
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('data_visualization') }}">Visualization</a>
-        <a href="{{ url_for('statistics') }}">Statistics</a>
+        <!-- <a href="{{ url_for('data_visualization') }}">Visualization</a> -->
+        <!-- <a href="{{ url_for('statistics') }}">Statistics</a> -->
 
-
+        <!-- Dropdown for Images -->
+        <div class="dropdown">
+            <a class="dropbtn" id="dropBtn">Files</a>
+            <div class="dropdown-content">
+                <a href="{{ url_for('data_visualization') }}">View</a>
+                <a href="{{ url_for('statistics') }}">Statistics</a>
+                
+            </div>
+        </div>
 
         <!-- Dropdown for Images -->
         <div class="dropdown">
@@ -18,9 +26,6 @@
                 
             </div>
         </div>
-
-
-
     
 
         <!-- Dropdown for News -->
@@ -28,7 +33,7 @@
             <a class="dropbtn" id="dropBtn">Account</a>
             <div class="dropdown-content">
                 <a href="{{ url_for('settings') }}">Settings</a>
-                <a href="#news1">Profile</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
                 <a id="sign-out-btn" href="{{ url_for('logout') }}">Logout</a>
             </div>
         </div>

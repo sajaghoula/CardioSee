@@ -13,9 +13,33 @@ import nibabel as nib
 import pydicom
 
 
-IMAGE_FOLDER = "/home/saja/CardioSee/images/download/"
+
 
 lib_bp = Blueprint('lib_bp', __name__)
+
+def get_images_path():
+    """Get the image folder path from Firestore system variables"""
+    try:
+        db = firestore.client()
+        
+        # Query for the images_path variable
+        docs = db.collection('SystemVariables')\
+                .where('variable', '==', 'images_path')\
+                .limit(1)\
+                .stream()
+        
+        for doc in docs:
+            data = doc.to_dict()
+            return data.get('value', '/home/saja/CardioSee/images/download/')  # Default fallback
+        
+        
+    except Exception as e:
+        print(f"Error getting image folder path: {e}")
+
+
+
+        
+IMAGE_FOLDER = get_images_path()
 
 @lib_bp.route("/library_data", methods=["GET"])
 def library_data():
@@ -41,6 +65,19 @@ def library_data():
             created_at_date = None
 
 
+
+        stats = data_entry.get("stats", {}) if data_entry else {}
+        quality = data_entry.get("quality", {}) if data_entry else {}
+        geometry = data_entry.get("geometry", {}) if data_entry else {}
+        physical_size = geometry.get("physical_size")
+        if physical_size:
+            physical_size = tuple(round(v, 2) for v in physical_size)
+
+        
+
+        
+
+
         result.append({
             "id": img_id,
             "name": img_data.get("name"),
@@ -48,9 +85,21 @@ def library_data():
             "createdBy": get_username(img_data.get("createdBy")),
             "createdAt": created_at_date,
             "metadata": data_entry.get("metadata") if data_entry else {},
-            "stats": data_entry.get("stats") if data_entry else {},
-            "quality": data_entry.get("quality") if data_entry else {},
-            "geometry": data_entry.get("geometry") if data_entry else {}
+            "stats": stats,
+            "quality": quality,
+            "geometry": geometry,
+
+
+            "min": stats.get("min"),
+            "max": stats.get("max"),
+            "mean": round(stats.get("mean"), 3) if stats.get("mean") is not None else None,
+            "range": quality.get("intensity_range"),
+            "median": stats.get("median"),
+            "dark": quality.get("dark"),
+            "dominant_tissue": quality.get("dominant_tissue"),
+            "physical_size": tuple(round(v, 2) for v in geometry.get("physical_size")),
+            "volume_cm3": round(geometry.get("volume_mm3") / 1000, 3) ,
+            "cardio": geometry.get("cardio"),
         })
 
     return jsonify(result)
@@ -195,3 +244,8 @@ def load_volume_3d():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+
+
+

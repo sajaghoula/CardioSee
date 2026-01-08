@@ -207,7 +207,7 @@ def get_correlation():
     is_numeric = check_numeric(series) 
 
     correlation_data_numeric_numeric = None
-    pvalues = {}
+    pvalues_numeric_numeric = {}
     correlation_data_numeric_categorical = None
 
     correlation_data_categorical_numeric = None
@@ -223,14 +223,23 @@ def get_correlation():
             correlation_data_numeric_numeric = numeric_df.corr(method="spearman")[column].drop(labels=[column]).to_dict()
 
 
-        
-
         for col in numeric_df.columns:
             if col == column:
                 continue
             
-            corr, pval = spearmanr(numeric_df[column], numeric_df[col])
-            pvalues[col] = pval
+            x = numeric_df[column]
+            y = numeric_df[col]
+
+            valid = x.notna() & y.notna()
+            x = x[valid]
+            y = y[valid]
+
+            if len(x) > 1:
+                corr, pval = spearmanr(x, y)
+            else:
+                corr, pval = None, None
+
+            pvalues_numeric_numeric[col] = pval
 
 
 
@@ -285,12 +294,8 @@ def get_correlation():
         # Categorical column → ANOVA with other numeric columns
         numeric_df = get_numerical(df)
 
-        
-
         correlation_data_categorical_numeric = {}
         correlation_data_categorical_categorical = {}
-
-        
 
         for col in numeric_df.columns:
             # Align numeric and categorical values, remove NaNs
@@ -320,7 +325,6 @@ def get_correlation():
                 F = p = eta_sq = None
 
             # Store results
-            print("-----------------------------------------", eta_sq)
             correlation_data_categorical_numeric[col] = {
                 "F": None if pd.isna(F) else float(F),
                 "p-value": None if pd.isna(p) else float(p),
@@ -330,11 +334,6 @@ def get_correlation():
         
 
         cat_df = get_categorical(df).drop(columns=[column]) 
-
-        print("-----------------------------------------", correlation_data_categorical_numeric)
-        
-
-
         
         for col in cat_df.columns:
             contingency = pd.crosstab(series, df[col].astype(str))  # cross-tabulate counts
@@ -348,9 +347,11 @@ def get_correlation():
                 
             except:
                 cramers_v = None
+                p = None
 
             correlation_data_categorical_categorical[col] = {
-                "cramers_v": None if pd.isna(cramers_v) else float(cramers_v)
+                "cramers_v": None if pd.isna(cramers_v) else float(cramers_v),
+                "p-value": None if pd.isna(p) else float(p)
             }
 
 
@@ -362,6 +363,7 @@ def get_correlation():
     correlation_data_categorical_categorical = NAN_converter(is_numeric, correlation_data_categorical_categorical)
     correlation_data_numeric_numeric = NAN_converter(is_numeric, correlation_data_numeric_numeric)
     #correlation_data_numeric_categorical = NAN_converter(is_numeric, correlation_data_numeric_categorical)
+    print("**********************************************", pvalues_numeric_numeric)
 
 
 
@@ -370,7 +372,8 @@ def get_correlation():
     return jsonify({"correlation_data_categorical_numeric": correlation_data_categorical_numeric, 
                     "correlation_data_categorical_categorical": correlation_data_categorical_categorical,
                     "correlation_data_numeric_numeric": correlation_data_numeric_numeric, 
-                    "correlation_data_numeric_categorical" : correlation_data_numeric_categorical })
+                    "correlation_data_numeric_categorical" : correlation_data_numeric_categorical,
+                     "pvalues_numeric_numeric" : pvalues_numeric_numeric })
 
 
 

@@ -3,6 +3,37 @@ const distContainer = document.getElementById("distContainer");
 const numericalDist = document.getElementById("numericalDist");
 const categoricalDist = document.getElementById("categoricalDist");
 
+async function getOutlierSystemVariables() {
+    try {
+        const response = await fetch('/get_system_variables');
+        const variables = await response.json();
+        
+        const varObj = {};
+        variables.forEach(v => {
+            varObj[v.variable] = v.value;
+        });
+        
+        // Parse coverage factor with validation
+        let coverageFactor = parseFloat(varObj.outlier_coverage_factor) || 1.96;
+        
+        // Validate against common Z-scores
+        const validZValues = [1.645, 1.96, 2.576, 3.291];
+        if (!validZValues.includes(coverageFactor)) {
+            console.warn(`Invalid coverage factor: ${coverageFactor}. Using default 1.96`);
+            coverageFactor = 1.96;
+        }
+
+        
+        return {
+            coverageFactor: coverageFactor,
+            
+        };
+    } catch (error) {
+        console.error('Error:', error);
+        return { coverageFactor: 1.96 }; // Default fallback
+    }
+}
+
 
 
 // STEP 5: View Distribution Analysis
@@ -115,31 +146,15 @@ viewDistributionAnalysisBtn.addEventListener("click", async () => {
             }
         });
 
-
-
-
-        // // VIOLIN PLOT (KDE line chart)
-        // const violinCanvas = document.createElement("canvas");
-        // violinCanvas.id = "violinChart";
-        // numericDist.appendChild(violinCanvas);
-
-        // new Chart(document.getElementById("violinChart"), {
-        //     type: "line",
-        //     data: {
-        //         labels: result.violin.x,
-        //         datasets: [{ label: "Violin / Density", data: result.violin.y, fill: true, backgroundColor: "rgba(153,102,255,0.2)", borderColor: "rgba(153,102,255,1)" }]
-        //     },
-        //     options: { scales: { x: { title: { display: true, text: column } }, y: { title: { display: true, text: "Density" } } } }
-        // });
-
-
+        const config = await getOutlierSystemVariables();
 
         const yValues = result.seriesData; // your numeric column
         const mean = math.mean(yValues);
         const std = math.std(yValues);
 
-        const coverageFactor = 1.96;
-        const ellipseHeight = coverageFactor * std; // ±1.96σ
+
+        const coverageFactor = config.coverageFactor;
+        const ellipseHeight = coverageFactor * std; 
         const ellipseWidth = 0.8; // X jitter range
         const centerX = 0.4; // middle of X-axis
         const centerY = mean;

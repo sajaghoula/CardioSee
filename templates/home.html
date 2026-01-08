@@ -8,7 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" >
 
-  <title>Flask Template</title>
+  <title>CardioSee</title>
+
 
 
   </head>
@@ -17,14 +18,125 @@
 
     {% include 'navbar_public.html' %}
 
-    <main>
 
-      <h1>Home Page</h1>
 
-      <p>This is a public page that anyone can view.</p>
-      <p>Use this template to create and customize more public pages for your app.</p>
 
-    </main>
+    <main class="home-container">
+
+  <!-- Hero Section -->
+  <section class="home-hero">
+     <div class="hero-icon">🫀</div>
+    <h1>CardioSee</h1>
+    <p class="hero-subtitle">
+      An interactive web platform for medical data visualization, statistical analysis,
+      and advanced exploration of medical images with a focus on cardiovascular imaging.
+    </p>
+  </section>
+
+  <!-- Short Description -->
+  <section class="home-description">
+    <p>
+      CardioSee is designed to support medical researchers, clinicians, and students in
+      exploring population-level clinical data and computed tomography (CT) images.
+      The platform integrates structured data analysis with multi-planar image visualization
+      and lays the foundation for automated cardiac image segmentation and 3D analysis.
+    </p>
+  </section>
+
+  <!-- Features Section -->
+  <section class="home-features">
+    <h2>Core Functionalities</h2>
+
+    <div class="features-grid">
+
+      <div class="feature-card">
+        <div class="card-icon">📊</div>
+        <h3>Data Visualization</h3>
+        <p>
+          Upload spreadsheet-based clinical datasets, explore their contents interactively,
+          and generate customizable visualizations between any selected variables.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">📈</div>
+        <h3>Statistical Analysis</h3>
+        <p>
+          Perform descriptive statistics, distribution analysis, and correlation studies
+          for both numerical and categorical clinical variables.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🩻</div>
+        <h3>Medical Image Viewer</h3>
+        <p>
+          Visualize CT images using synchronized axial, sagittal, and coronal views,
+          enabling intuitive exploration of anatomical structures.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="card-icon">🗂️</div>
+        <h3>Image Library & Analysis</h3>
+        <p>
+          Manage uploaded medical images, store metadata securely, inspect 3D reconstructions,
+          and prepare segmented cardiac images for further analysis.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+<!-- Target Users -->
+<section class="home-features">
+  <h2>Target Users</h2>
+
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <div class="card-icon">👩🏻‍🔬</div>
+      <h3>Medical Researchers</h3>
+
+    </div>
+
+    <div class="feature-card">
+       <div class="card-icon">🩺👩🏻‍⚕️</div>
+      <h3>Clinicians & Radiologists</h3>
+
+    </div>
+
+    <div class="feature-card">
+      <div class="card-icon">👩🏻‍💻</div>
+      <h3>Biomedical Engineers</h3>
+
+    </div>
+
+    <div class="feature-card">
+      <div class="card-icon">👩🏻‍🏫</div>
+      <h3>Students & Academics</h3>
+
+    </div>
+
+  </div>
+</section>
+
+
+  <!-- Academic Context -->
+  <section class="home-academic">
+    <h2>Academic Context</h2>
+    <p>
+      This platform is developed as part of a Master’s Thesis at the University of Santiago de Compostela,
+      in collaboration with the Research Center for Intelligent Technologies (CiTIUS).
+      The work contributes to the broader research project  “Cátedra de Inteligencia Artificial aplicada a la Medicina Personalizada
+      y de Precisión”.
+    </p>
+  </section>
+
+</main>
+
+
+
 
     {% include 'footer.html' %}
 

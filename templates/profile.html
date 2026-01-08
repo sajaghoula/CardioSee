@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Visualization</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+
+  <body>
+    {% include 'navbar_private.html' %}
+
+    <main>
+      <section class="profile-container">
+
+        
+
+        <div class="profile-card">
+          <div class="profile-header">
+            <div class="profile-icon" id="profileIcon"></div>
+            <div>
+              <h3 id="profileName">User Name</h3>
+              <span id="profileRole">Role</span>
+            </div>
+          </div>
+
+          <div class="profile-info">
+            <div><strong>Email:</strong> <span id="profileEmail"></span></div>
+            <div><strong>Category:</strong> <span id="category"></span></div>
+            <div><strong>Phone Number:</strong> <span id="phoneNumber"></span></div>
+            
+            <div><strong>Status:</strong> <span id="profileStatus"></span></div>
+            
+            
+          </div>
+        </div>
+
+
+      </section>
+    </main>
+
+
+
+
+  </body>
+</html>
+
+
+
+
+
+
+
+
+<script type="module">
+
+fetchProfile()
+
+async function fetchProfile() {
+  console.log('test')
+  const res = await fetch("/get_profile_info");
+  const profile = await res.json();
+
+  if (profile.error) {
+    console.error(profile.error);
+    return;
+  }
+
+  var status = ''
+
+  if(profile.status == 1){
+    status = 'Active'
+  }else if(profile.status == 0){
+    status = 'Deleted'
+  }
+
+  // Render profile
+  document.getElementById("profileName").textContent = profile.name;
+  document.getElementById("profileRole").textContent = profile.role;
+  document.getElementById("profileEmail").textContent = profile.email;
+  document.getElementById("category").textContent = profile.category;
+  document.getElementById("phoneNumber").textContent = profile.phoneNumber;
+  document.getElementById("profileStatus").textContent = status;
+  
+
+
+  document.getElementById("profileIcon").textContent =
+    getCategoryIcon(profile.category);
+}
+
+
+function getCategoryIcon(category) {
+  switch (category) {
+    case "medical": return "🧠";
+    case "research": return "👩‍🎓";
+    case "technical": return "⚙️";
+    case "administrative": return "📋";
+    default: return "👤";
+  }
+}
+
+</script>
+
+
+
+
+
+
+
+
+<style>
+  
+  @media (max-width: 480px) {
+  .profile-card {
+    width: 90%;
+    padding: 1rem;
+  }
+  .profile-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+  }
+}
+
+
+.profile-card {
+  width: 350px;       /* bigger */
+  max-width: 90%;     /* responsive */
+  padding: 2rem;
+  border-radius: var(--radius);
+  background-color: var(--primary-color);
+  box-shadow: var(--shadow-soft);
+  transition: var(--transition);
+}
+
+.profile-card:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.profile-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--border-color);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+
+.profile-header h3 {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.profile-header span {
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+.profile-info div {
+  padding: 0.4rem 0;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.profile-info div:last-child {
+  border-bottom: none;
+}
+.profile-info p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.profile-info p strong {
+  color: var(--text-color);
+}
+.profile-info hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 0.5rem 0;
+}
+.profile-container {
+  display: flex;
+  justify-content: center; /* horizontal center */
+  align-items: center;     /* vertical center */
+  height: 100%;            /* full height of section/main */
+  padding: 2rem;
+}
+
+</style>
