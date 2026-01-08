@@ -31,7 +31,7 @@
   <section class="dashboard-summary">
 
     <div class="summary-card">
-      <div class="card-icon">🖼️</div>
+      <div class="card-icon">🩻</div>
       <h3>Uploaded Images</h3>
       <p class="summary-value" id="total-images">0</p>
       <span class="summary-hint">CT images processed</span>
@@ -44,12 +44,22 @@
       <span class="summary-hint">Predicted cardiac relevance</span>
     </div>
 
-    <div class="summary-card">
-      <div class="card-icon">🌗</div>
-      <h3>Image Intensity</h3>
-      <p class="summary-value" id="intensity-balance">0%</p>
-      <span class="summary-hint">Dark vs light distribution</span>
+<div class="summary-card">
+  <div class="card-icon">🌗</div>
+  <h3>Image Intensity</h3>
+  <div class="intensity-bar-container">
+    <div class="intensity-bar-high" id="bar-high">
+      <span class="bar-text" id="bar-text-high"></span>
     </div>
+    <div class="intensity-bar-low" id="bar-low">
+      <span class="bar-text" id="bar-text-low"></span>
+    </div>
+  </div>
+</div>
+
+
+
+
 
     <div class="summary-card">
       <div class="card-icon">📦</div>
@@ -63,13 +73,13 @@
   <!-- Charts Section -->
   <section class="dashboard-charts">
 
-    <div class="chart-card">
-      <h2>Image Tissue Distribution</h2>
-      <p class="chart-subtitle">
-        Relative proportions of lung, air, and fat tissue across uploaded CT images.
-      </p>
-      <canvas id="tissuePieChart"></canvas>
-    </div>
+  <div class="chart-card">
+    <h2>Image Tissue Distribution</h2>
+    <p class="chart-subtitle">
+      Relative proportions of lung, air, and fat tissue across uploaded CT images.
+    </p>
+    <canvas id="tissuePieChart" width="400" height="400"></canvas>
+  </div>
 
     <div class="chart-card">
       <h2>Prediction-Based Image Classification</h2>
@@ -119,12 +129,15 @@
 
     <script src="{{ url_for('static', filename='login-auth.js') }}" type="module"></script>
     <script src="{{ url_for('static', filename='scripts.js') }}" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 
   </body>
   
 
 </html>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
   const hamburger = document.querySelector('.hamburger');
@@ -138,4 +151,217 @@
   closeBtn.addEventListener('click', () => {
     navbarRight.classList.remove('active');
   });
+
+  async function updateImageSummary() {
+  try {
+    const response = await fetch("/get_image_counts"); // call your Flask API
+    const data = await response.json();
+
+    if (data.error) {
+      console.error("Error from API:", data.error);
+      return;
+    }
+
+    // update HTML
+    document.getElementById("total-images").textContent = data.total;
+
+    // add cardio info if not already present
+    let cardioSpan = document.getElementById("cardio-images");
+    if (!cardioSpan) {
+      cardioSpan = document.createElement("span");
+      cardioSpan.id = "cardio-images";
+      cardioSpan.className = "summary-hint";
+      document.querySelector(".summary-card").appendChild(cardioSpan);
+    }
+    cardioSpan.textContent = `${data.cardio}`;
+
+  } catch (error) {
+    console.error("Error fetching image counts:", error);
+  }
+}
+
+// call the function
+updateImageSummary();
+
+
+
+
+
+document.addEventListener("DOMContentLoaded", function() {
+
+  async function drawTissuePieChart() {
+    try {
+      const response = await fetch("/get_tissue_distribution");
+      const data = await response.json();
+
+      if (data.error) {
+        console.error("Error from API:", data.error);
+        return;
+      }
+
+      const labels = Object.keys(data);
+      const counts = Object.values(data);
+
+      const ctx = document.getElementById("tissuePieChart").getContext("2d");
+
+      if (window.tissueChart) {
+        window.tissueChart.destroy(); // remove old chart if exists
+      }
+
+      window.tissueChart = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: labels,
+          datasets: [{
+            data: counts,
+            backgroundColor: [
+              "#36A2EB", // lung
+              "#FF6384", // air
+              "#FFCE56", // fat
+              "#8BC34A", // extra tissues if any
+              "#FF9800"
+            ]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const total = counts.reduce((a,b) => a+b, 0);
+                  const percent = ((context.raw / total) * 100).toFixed(1);
+                  return `${context.label}: ${context.raw} (${percent}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error("Error drawing tissue pie chart:", error);
+    }
+  }
+
+  drawTissuePieChart(); // call it
+
+});
+
+
+
+async function updateIntensityBar() {
+  try {
+    const response = await fetch("/get_intensity_counts");
+    const data = await response.json();
+
+    if (data.error) {
+      console.error("Error from API:", data.error);
+      return;
+    }
+
+    const total = data.low + data.high;
+    const lowPercent = total ? (data.low / total) * 100 : 0;
+    const highPercent = total ? (data.high / total) * 100 : 0;
+
+    // swap colors: high on left, low on right
+    document.getElementById("bar-high").style.width = highPercent + "%";
+    document.getElementById("bar-low").style.width = lowPercent + "%";
+
+    // show percentages inside each segment
+    document.getElementById("bar-text-high").textContent = highPercent.toFixed(0) + "%";
+    document.getElementById("bar-text-low").textContent = lowPercent.toFixed(0) + "%";
+
+  } catch (error) {
+    console.error("Error fetching intensity counts:", error);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", updateIntensityBar);
+
+
+
+async function updateMedianVolume() {
+  try {
+    const response = await fetch("/get_median_volume");
+    const data = await response.json();
+
+    if (data.error) {
+      console.error("Error from API:", data.error);
+      return;
+    }
+
+    document.getElementById("median-volume").textContent = `${data.median_cm3} cm³`;
+
+  } catch (error) {
+    console.error("Error fetching median volume:", error);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", updateMedianVolume);
+
+
 </script>
+
+<style>
+
+
+.intensity-bar-dark {
+  background-color: #555; /* dark color */
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+.intensity-bar-light {
+  background-color: #f5f5a5; /* light color */
+  width: 0%;
+  transition: width 0.5s ease;
+}
+
+
+.intensity-bar-container {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  border-radius: 15px;
+  overflow: hidden;
+  background-color: #ddd; /* fallback */
+  font-weight: bold;
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.intensity-bar-high {
+  background: #fef3c7; /* light yellow for high intensity */
+  width: 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.5s ease;
+  color: #000;
+  position: relative;
+}
+
+.intensity-bar-low {
+  background: #4b5563; /* dark gray for low intensity */
+  width: 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: width 0.5s ease;
+  color: #fef3c7;
+  position: relative;
+}
+
+.bar-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-weight: bold;
+  z-index: 2;
+  pointer-events: none;
+}
+
+
+</style>

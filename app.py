@@ -11,6 +11,8 @@ from images_vi import image_bp
 from library import lib_bp
 from settings import settings_bp
 from profile import profile_bp
+from dashboard import dashboard_bp
+
 
 from flask_cors import CORS
 load_dotenv()
@@ -62,6 +64,8 @@ app.register_blueprint(image_bp)
 app.register_blueprint(lib_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(profile_bp)
+app.register_blueprint(dashboard_bp)
+
 
 
 
