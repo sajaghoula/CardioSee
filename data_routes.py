@@ -120,18 +120,18 @@ def column_stats():
         numeric = pd.to_numeric(cleaned_series, errors="coerce")
         numeric_mode = numeric.mode()
         stats = {
-            "Count": len(series),
-            "Mean": numeric.mean(),
-            "Median": numeric.median(),
-            "Mode": numeric_mode.tolist() if len(numeric_mode) > 1 else numeric_mode[0],
-            "Std Dev": numeric.std(),
-            "Variance": numeric.var(),
-            "Min": numeric.min(),
-            "Max": numeric.max(),
-            "Missing": series.isna().sum(),
-            "Interquartile Range (IQR)": numeric.quantile(0.75) - numeric.quantile(0.25),
-
-            
+            "Count": round(len(series), 2),
+            "Mean": round(numeric.mean(), 2),
+            "Median": round(numeric.median(), 2),
+            "Mode": round(numeric_mode[0], 2),
+            "Std Dev": round(numeric.std(), 2),
+            "Variance": round(numeric.var(), 2),
+            "Min": round(numeric.min(), 2),
+            "Max": round(numeric.max(), 2),
+            "Missing": round(series.isna().sum(), 2),
+            "Interquartile Range (IQR)": round(
+                numeric.quantile(0.75) - numeric.quantile(0.25), 2
+            ),
         }
         col_type = "Numeric"
         pie_data = None
@@ -153,7 +153,7 @@ def column_stats():
         stats = {
             "Count": len(series),
             "Unique categories": cleaned_series.nunique(),
-            "Most frequent": cleaned_series.mode()[0] if not cleaned_series.mode().empty else "None",
+            "Most frequent": cleaned_series.mode()[0] , #if not cleaned_series.mode().empty else "None",
             "Missing": series.isna().sum(),
             #"Counts": counts.to_dict()  # full table still optional, can also normalize here if needed
         }
@@ -244,7 +244,7 @@ def get_correlation():
 
 
         # HERE - Find the Correlation between the numeric column and the Categorical column
-        # 2) Numeric ↔ Categorical → Correlation Ratio η²
+        # 2) Numeric ↔ Categorical 
         categorical_df = get_categorical(df)
         
         correlation_data_numeric_categorical = {}
@@ -356,14 +356,13 @@ def get_correlation():
 
 
 
-
+ 
 
     # Ensure numeric NaNs are converted to None
     correlation_data_categorical_numeric = NAN_converter(is_numeric, correlation_data_categorical_numeric)
     correlation_data_categorical_categorical = NAN_converter(is_numeric, correlation_data_categorical_categorical)
     correlation_data_numeric_numeric = NAN_converter(is_numeric, correlation_data_numeric_numeric)
     #correlation_data_numeric_categorical = NAN_converter(is_numeric, correlation_data_numeric_categorical)
-    print("**********************************************", pvalues_numeric_numeric)
 
 
 

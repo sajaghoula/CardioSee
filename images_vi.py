@@ -26,6 +26,55 @@ image_bp = Blueprint('image_bp', __name__)
 volume_store = {}
 z_threshold = 300
 
+import SimpleITK as sitk
+import tempfile
+import os
+
+def nifti_to_mha(file):
+    """
+    Convert NIfTI (.nii / .nii.gz) to MHA
+    Returns a file-like object
+    """
+    with tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False) as tmp_nifti:
+        file.save(tmp_nifti.name)
+        nifti_path = tmp_nifti.name
+
+    image = sitk.ReadImage(nifti_path)
+
+    mha_tmp = tempfile.NamedTemporaryFile(suffix=".mha", delete=False)
+    sitk.WriteImage(image, mha_tmp.name)
+
+    os.unlink(nifti_path)  # cleanup
+
+    return open(mha_tmp.name, "rb")
+
+
+
+def dicom_to_mha(file):
+    """
+    Convert DICOM (.dcm) to MHA
+    Assumes a single DICOM file or same-series upload
+    """
+    with tempfile.TemporaryDirectory() as dicom_dir:
+        dicom_path = os.path.join(dicom_dir, file.filename)
+        file.save(dicom_path)
+
+        reader = sitk.ImageSeriesReader()
+        series_ids = reader.GetGDCMSeriesIDs(dicom_dir)
+
+        if not series_ids:
+            raise ValueError("No DICOM series found")
+
+        series_files = reader.GetGDCMSeriesFileNames(dicom_dir, series_ids[0])
+        reader.SetFileNames(series_files)
+
+        image = reader.Execute()
+
+        mha_tmp = tempfile.NamedTemporaryFile(suffix=".mha", delete=False)
+        sitk.WriteImage(image, mha_tmp.name)
+
+        return open(mha_tmp.name, "rb")
+
 
 @image_bp.route('/upload_image', methods=['POST'])
 def upload_image():
@@ -35,25 +84,21 @@ def upload_image():
 
     filename = file.filename.lower()
 
-    if filename.endswith(".nii") or filename.endswith(".nii.gz"):
-        data = prepare_nifti(file, filename)
-
-
+    if filename.endswith((".nii", ".nii.gz")):
+        mha_file = nifti_to_mha(file)
 
     elif filename.endswith(".dcm"):
-        data = prepare_dicom(file)
-
+        mha_file = dicom_to_mha(file)
 
     elif filename.endswith(".mha"):
-        data = prepare_mha(file)
-
+        mha_file = file
 
     else:
         return jsonify({"error": "Unsupported file type"}), 400
-    
+
+    return prepare_mha(mha_file)
 
 
-    return data
 
 
 # Return a single slice on demand
@@ -75,10 +120,14 @@ def get_slice():
         if index >= vol.shape[2]:
             index = vol.shape[2] - 1
         slice_img = vol[:, :, index]
+        slice_img = np.flipud(slice_img) # FIX Y-axis
+
+
     elif view == "coronal":
         if index >= vol.shape[1]:
             index = vol.shape[1] - 1
         slice_img = vol[:, index, :]
+        slice_img = np.flipud(slice_img) # FIX Y-axis
     else:
         return jsonify({"error": "Invalid view"}), 400
 
@@ -278,19 +327,40 @@ def prepare_dicom(file):
         })
 
 
+
+import os
+import numpy as np
+import SimpleITK as sitk
+import tempfile
+
 def prepare_mha(file):
+    """
+    Accepts either:
+    - Flask FileStorage (has .filename, .save)
+    - Python file object (BufferedReader)
+    """
 
-    # Save uploaded file temporarily
-    temp_path = f"/tmp/{file.filename}"
-    file.save(temp_path)
+    # -------------------------
+    # Determine temp path
+    # -------------------------
+    if hasattr(file, "filename"):  # Flask upload
+        temp_path = f"/tmp/{file.filename}"
+        file.save(temp_path)
 
-    # Read the MHA
+    else:  # Python file object (from conversion)
+        temp_path = tempfile.NamedTemporaryFile(suffix=".mha", delete=False).name
+        with open(temp_path, "wb") as f:
+            f.write(file.read())
+
+    # -------------------------
+    # Read MHA
+    # -------------------------
     img = sitk.ReadImage(temp_path)
 
-    # Convert to numpy (SimpleITK returns Z,Y,X)
-    vol = sitk.GetArrayFromImage(img).astype(np.float32)
+    img = resample_to_isotropic(img)
 
-    # Clean volume
+
+    vol = sitk.GetArrayFromImage(img).astype(np.float32)
     vol = np.nan_to_num(vol)
 
     if vol.ndim == 2:
@@ -299,13 +369,13 @@ def prepare_mha(file):
     volume_store["volume"] = vol
 
 
-    # Return metadata (same structure as your dicom function)
     return jsonify({
         "depth": vol.shape[0],
         "height": vol.shape[1],
         "width": vol.shape[2],
         "type": "mha"
     })
+
 
 
 def extract_image_info(file):
@@ -545,3 +615,20 @@ def calculate_physical_size(spacing, shape):
     }
 
 
+def resample_to_isotropic(img, new_spacing=(1.0, 1.0, 1.0)):
+    original_spacing = img.GetSpacing()
+    original_size = img.GetSize()
+
+    new_size = [
+        int(round(osz * ospc / nspc))
+        for osz, ospc, nspc in zip(original_size, original_spacing, new_spacing)
+    ]
+
+    resampler = sitk.ResampleImageFilter()
+    resampler.SetOutputSpacing(new_spacing)
+    resampler.SetSize(new_size)
+    resampler.SetOutputDirection(img.GetDirection())
+    resampler.SetOutputOrigin(img.GetOrigin())
+    resampler.SetInterpolator(sitk.sitkLinear)
+
+    return resampler.Execute(img)

@@ -49,8 +49,25 @@ if (result.correlation_data_numeric_numeric && Object.keys(result.correlation_da
         window.numeric_corrContainer.destroy();
     }
 
-    const keys = Object.keys(result.correlation_data_numeric_numeric);
-    const values = Object.values(result.correlation_data_numeric_numeric);
+
+
+    const entries = Object.keys(result.correlation_data_numeric_numeric).map(k => ({
+        key: k,
+        r: result.correlation_data_numeric_numeric[k],
+        p: pvals[k]
+    }));
+    entries.sort((a, b) => {
+        const sigA = a.p !== null && a.p < 0.05;
+        const sigB = b.p !== null && b.p < 0.05;
+
+        if (sigA !== sigB) return sigB - sigA;
+        if (a.p !== null && b.p !== null) return a.p - b.p;
+
+        return Math.abs(b.r) - Math.abs(a.r);
+    });
+    const keys = entries.map(e => e.key);
+    const values = entries.map(e => e.r);
+
 
     window.numeric_corrContainer = new Chart(ctx, {
         type: "bar",
@@ -60,8 +77,19 @@ if (result.correlation_data_numeric_numeric && Object.keys(result.correlation_da
                 label: `Spearman correlation with ${col}`,
                 data: values.map(v => v !== null ? v.toFixed(3) : 0),
                 backgroundColor: keys.map((k, i) => {
+                    const r = Math.abs(values[i]);
                     const p = pvals[k];
-                    const alpha = (p !== null && p < 0.05) ? 0.9 : 0.3;
+
+                    let alpha;
+
+                    if (p !== null && p < 0.05) {
+                        // dark stays dark → stronger = darker
+                        alpha = 0.75 + 0.50 * r;   // 0.6 → 0.95
+                    } else {
+                        // light stays light → weaker = lighter
+                        alpha = 0.10 + 0.1 * r;  // 0.15 → 0.4
+                    }
+
                     return values[i] >= 0
                         ? `rgba(54,162,235,${alpha})`
                         : `rgba(255,99,132,${alpha})`;
@@ -69,7 +97,9 @@ if (result.correlation_data_numeric_numeric && Object.keys(result.correlation_da
                 borderColor: values.map(v =>
                     v >= 0 ? "rgba(54,162,235,1)" : "rgba(255,99,132,1)"
                 ),
-                borderWidth: 1
+                borderWidth: keys.map(k =>
+    pvals[k] !== null && pvals[k] < 0.05 ? 2 : 1
+),
             }]
         },
         options: {
@@ -99,7 +129,6 @@ if (result.correlation_data_numeric_numeric && Object.keys(result.correlation_da
 }
 
 
-
 if (result.correlation_data_numeric_categorical && Object.keys(result.correlation_data_numeric_categorical).length > 0) {
     corrContainer.classList.add("hidden");
     const numeric_corrContainer = document.getElementById("numeric_corrContainer");
@@ -109,9 +138,9 @@ if (result.correlation_data_numeric_categorical && Object.keys(result.correlatio
     numeric_categorical_correlation.classList.remove("hidden");
     numeric_categorical_correlation.innerHTML = "";
 
-    // Create canvas for the chart
+    // Create canvas for the chart (increased size)
     const canvasId = "numeric_categorical_barchart";
-    numeric_categorical_correlation.innerHTML = `<canvas id="${canvasId}" width="600" height="300"></canvas>`;
+    numeric_categorical_correlation.innerHTML = `<canvas id="${canvasId}" width="800" height="400"></canvas>`;
     const ctx = document.getElementById(canvasId).getContext("2d");
 
     // Destroy previous chart if exists
@@ -119,18 +148,44 @@ if (result.correlation_data_numeric_categorical && Object.keys(result.correlatio
         window.numericCategoricalChart.destroy();
     }
 
-    const keys = Object.keys(result.correlation_data_numeric_categorical);
-    const values = Object.values(result.correlation_data_numeric_categorical);
+    // Prepare entries
+    const entries = Object.keys(result.correlation_data_numeric_categorical).map(k => ({
+        key: k,
+        eta: result.correlation_data_numeric_categorical[k].eta_squared,
+        p: result.correlation_data_numeric_categorical[k]["p-value"]
+    }));
 
-    // Extract eta_squared and p-value
-    const valuesForChart = values.map(v =>
-        v.eta_squared !== null ? Number(v.eta_squared.toFixed(3)) : 0
-    );
+    // Sort by significance (smallest p first)
+    entries.sort((a, b) => {
+        if (a.p === null) return 1;
+        if (b.p === null) return -1;
+        return a.p - b.p;
+    });
 
-    const backgroundColors = values.map(v => {
-        const alpha = (v["p-value"] !== null && v["p-value"] < 0.05) ? 0.9 : 0.3; // solid if significant
+    const keys = entries.map(e => e.key);
+    const valuesForChart = entries.map(e => e.eta !== null ? Number(e.eta.toFixed(3)) : 0);
+
+    // Prepare p-values for scaling dark bars
+    const sigPs = entries.map(e => e.p).filter(p => p !== null && p < 0.05);
+    const minSigP = sigPs.length > 0 ? Math.min(...sigPs) : 0.001;
+    const maxSigP = sigPs.length > 0 ? Math.max(...sigPs) : 0.05;
+
+    // Dynamic background color
+    const backgroundColors = entries.map(e => {
+        let alpha;
+        if (e.p !== null && e.p < 0.05) {
+            // Significant → dark, scale based on p-value
+            const t = (e.p - minSigP) / (maxSigP - minSigP || 1); // normalize 0 → 1
+            alpha = 0.95 - 0.25 * t; // smaller p → darker
+        } else {
+            // Not significant → light
+            alpha = 0.2;
+        }
         return `rgba(54,162,235,${alpha})`;
     });
+
+    // Determine max Y for chart to make small η² visible
+    const maxY = Math.max(...valuesForChart) * 1.1 || 0.1;
 
     window.numericCategoricalChart = new Chart(ctx, {
         type: "bar",
@@ -153,7 +208,7 @@ if (result.correlation_data_numeric_categorical && Object.keys(result.correlatio
                         label: function(ctx) {
                             const idx = ctx.dataIndex;
                             const eta = valuesForChart[idx];
-                            const p = values[idx]["p-value"];
+                            const p = entries[idx].p;
                             return `η² = ${eta}, p = ${p !== null ? p.toExponential(2) : "NA"}`;
                         }
                     }
@@ -162,14 +217,13 @@ if (result.correlation_data_numeric_categorical && Object.keys(result.correlatio
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 1,
+                    max: maxY,
                     title: { display: true, text: "η²" }
                 }
             }
         }
     });
 }
-
 
 
 
@@ -185,15 +239,49 @@ if (result.correlation_data_categorical_categorical &&
 
     const data = result.correlation_data_categorical_categorical;
 
-    const cols = Object.keys(data);
-    const cramersValues = cols.map(col => data[col].cramers_v ?? 0);
-    const pvalues = cols.map(col => data[col]["p-value"] ?? 1); // default 1 if missing
+    // Prepare entries
+    const entries = Object.keys(data).map(col => ({
+        key: col,
+        cramers: data[col].cramers_v ?? 0,
+        p: data[col]["p-value"] ?? 1
+    }));
 
-    // --------------------------
-    // Combined Chart: Cramer's V + p-value
-    // --------------------------
-    container.innerHTML += `<h3>🔗 Correlation with Categorical Columns -Carmers & Chai2- </h3>`;
-    container.innerHTML += `<canvas id="categorical_categorical_chart" width="600" height="300"></canvas>`;
+    // Sort by significance (lowest p first)
+    entries.sort((a, b) => {
+        if (a.p === null) return 1;
+        if (b.p === null) return -1;
+        return a.p - b.p;
+    });
+
+    const cols = entries.map(e => e.key);
+    const cramersValues = entries.map(e => e.cramers !== null ? parseFloat(e.cramers.toFixed(3)) : 0);
+    const pvalues = entries.map(e => e.p);
+
+    // Prepare p-values for scaling dark bars
+    const sigPs = entries.map(e => e.p).filter(p => p !== null && p < 0.05);
+    const minSigP = sigPs.length > 0 ? Math.min(...sigPs) : 0.001;
+    const maxSigP = sigPs.length > 0 ? Math.max(...sigPs) : 0.05;
+
+    // Dynamic background color
+    const barColors = entries.map(e => {
+        let alpha;
+        if (e.p !== null && e.p < 0.05) {
+            // Significant → dark, scale based on p-value
+            const t = (e.p - minSigP) / (maxSigP - minSigP || 1);
+            alpha = 0.95 - 0.25 * t; // smaller p → darker
+        } else {
+            // Not significant → light
+            alpha = 0.2;
+        }
+        return `rgba(54,162,235,${alpha})`;
+    });
+
+    // Determine max Y dynamically for visibility
+    const maxY = Math.max(...cramersValues) * 1.1 || 0.1;
+
+    // Create chart
+    container.innerHTML += `<h3>🔗 Correlation with Categorical Columns - Cramer's V & Chi-square - </h3>`;
+    container.innerHTML += `<canvas id="categorical_categorical_chart" width="800" height="400"></canvas>`;
 
     const ctx = document.getElementById("categorical_categorical_chart").getContext("2d");
 
@@ -201,16 +289,13 @@ if (result.correlation_data_categorical_categorical &&
         window.categoricalCategoricalChart.destroy();
     }
 
-    // Use blue for bars, darker for smaller p-values
-    const barColors = pvalues.map(p => `rgba(54,162,235,${p < 0.05 ? 0.9 : 0.5})`);
-
     window.categoricalCategoricalChart = new Chart(ctx, {
         type: "bar",
         data: {
             labels: cols,
             datasets: [{
                 label: "Cramer's V (strength)",
-                data: cramersValues.map(v => v !== null ? parseFloat(v.toFixed(3)) : 0),
+                data: cramersValues,
                 backgroundColor: barColors,
                 borderColor: barColors,
                 borderWidth: 1
@@ -232,7 +317,11 @@ if (result.correlation_data_categorical_categorical &&
                 }
             },
             scales: {
-                y: { min: 0, max: 1, title: { display: true, text: "Cramer's V" } }
+                y: {
+                    min: 0,
+                    max: maxY,
+                    title: { display: true, text: "Cramer's V" }
+                }
             }
         }
     });
@@ -240,21 +329,51 @@ if (result.correlation_data_categorical_categorical &&
 
 
 
+
 if (result.correlation_data_categorical_numeric && Object.keys(result.correlation_data_categorical_numeric).length > 0) {
     corrContainer.classList.remove("hidden");
     numeric_corrContainer.classList.add("hidden");
 
-    const keys = Object.keys(result.correlation_data_categorical_numeric);
-    const values = Object.values(result.correlation_data_categorical_numeric);
+    // Prepare entries
+    const entries = Object.keys(result.correlation_data_categorical_numeric).map(k => ({
+        key: k,
+        eta: result.correlation_data_categorical_numeric[k].eta_squared_cn,
+        p: result.correlation_data_categorical_numeric[k]["p-value"]
+    }));
 
-    // Prepare data
-    const etaValues = values.map(v => v.eta_squared_cn !== null ? Number(v.eta_squared_cn.toFixed(3)) : 0);
-    const backgroundColors = values.map(v => {
-        const alpha = (v["p-value"] !== null && v["p-value"] < 0.05) ? 0.9 : 0.3; // solid if significant
+    // Sort by significance (lowest p first)
+    entries.sort((a, b) => {
+        if (a.p === null) return 1;
+        if (b.p === null) return -1;
+        return a.p - b.p;
+    });
+
+    const keys = entries.map(e => e.key);
+    const etaValues = entries.map(e => e.eta !== null ? Number(e.eta.toFixed(3)) : 0);
+
+    // Prepare p-values for scaling dark bars
+    const sigPs = entries.map(e => e.p).filter(p => p !== null && p < 0.05);
+    const minSigP = sigPs.length > 0 ? Math.min(...sigPs) : 0.001;
+    const maxSigP = sigPs.length > 0 ? Math.max(...sigPs) : 0.05;
+
+    // Dynamic background color
+    const backgroundColors = entries.map(e => {
+        let alpha;
+        if (e.p !== null && e.p < 0.05) {
+            // Significant → dark, scale based on p-value
+            const t = (e.p - minSigP) / (maxSigP - minSigP || 1); // normalize 0 → 1
+            alpha = 0.95 - 0.25 * t; // smaller p → darker
+        } else {
+            // Not significant → light
+            alpha = 0.2;
+        }
         return `rgba(54,162,235,${alpha})`;
     });
 
-    // Clear container
+    // Determine max Y dynamically
+    const maxY = Math.max(...etaValues) * 1.1 || 0.1;
+
+    // Clear container and create canvas
     correlationPValContainer.innerHTML = `<canvas id="categoricalNumericChart" width="800" height="400"></canvas>`;
     const ctx = document.getElementById("categoricalNumericChart").getContext("2d");
 
@@ -263,6 +382,7 @@ if (result.correlation_data_categorical_numeric && Object.keys(result.correlatio
         window.categoricalNumericChart.destroy();
     }
 
+    // Create chart
     window.categoricalNumericChart = new Chart(ctx, {
         type: "bar",
         data: {
@@ -284,7 +404,7 @@ if (result.correlation_data_categorical_numeric && Object.keys(result.correlatio
                         label: function(ctx) {
                             const idx = ctx.dataIndex;
                             const eta = etaValues[idx];
-                            const p = values[idx]["p-value"];
+                            const p = entries[idx].p;
                             return `η² = ${eta}, p = ${p !== null ? p.toExponential(2) : "NA"}`;
                         }
                     }
@@ -293,12 +413,13 @@ if (result.correlation_data_categorical_numeric && Object.keys(result.correlatio
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 1,
+                    max: maxY,
                     title: { display: true, text: "η²" }
                 }
             }
         }
     });
 }
+
 
 });

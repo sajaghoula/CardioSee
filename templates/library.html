@@ -20,7 +20,7 @@
 
     <main>
      <section class="analysis-container">
-    <h1>📚 Image Library</h1>
+    <h1> 🗂️Image Library</h1>
     <p class="subtitle">Browse and manage all uploaded medical images.</p>
 
     <!-- Table Wrapper -->
@@ -33,7 +33,7 @@
                 type="text" 
                 id="searchInput" 
                 class="search-box" 
-                placeholder="Search by filename, type, or user..."
+                placeholder="Search ..."
             />
 
 
@@ -60,16 +60,16 @@
                     <th data-sort="name">File Name</th>
                     <th data-sort="filetype">File Type</th>
                     <!-- <th data-sort="createdBy">Uploaded By</th> -->
-                    <!-- <th data-sort="createdAt">Date</th> -->
-                    <th data-sort="dominant_tissue">Dominant Tissue</th>
+                    <!-- <th data-sort="createdAt">Date</th> 
+                    <th data-sort="dominant_tissue">Dominant Tissue</th> -->
+                    <th data-sort="total_eat_volume">EAT Volume (cm3)</th>
                     <th data-sort="median">median</th>
-                    <th data-sort="physical_size">Size (x,y,z)</th>
+                    <!--<th data-sort="physical_size">Size (x,y,z)</th> -->
                     <th data-sort="volume_cm3">Volume (cm3)</th>
-                    <th data-sort="dark">Low Intencity</th>
-                    <th data-sort="cardio">is Cardio</th>
-                    
-                    
-                                        
+                    <th data-sort="dark">Low Contrast</th>
+                    <!--<th data-sort="cardio">is Cardio</th> -->
+                    <th data-sort="segmentation">Segmentation</th>
+                   
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -95,8 +95,9 @@
                 <div class="tabs">
                     <!--  <button class="tab-btn active" data-tab="overviewTab">Overview</button> -->
                     <button class="tab-btn active" data-tab="qualityTab">Quality</button>
-                    <button class="tab-btn" data-tab="geometryTab">Geometry</button>
                     <button class="tab-btn" data-tab="statsTab">Statistics</button>
+                    <button class="tab-btn" data-tab="segmentationTab">Segmentation</button>
+                    <button class="tab-btn" data-tab="geometryTab">Pericardium</button>
                 </div>
 
                 <!-- Tab Content -->
@@ -114,6 +115,10 @@
 
                 <div id="statsTab" class="tab">
                     <div id="statsContent"></div>
+                </div>
+
+                <div id="segmentationTab" class="tab">
+                    <div id="segmentationContent"></div>
                 </div>
 
             </div>
@@ -170,7 +175,7 @@
 
 <!-- Modal for 3D visualization -->
 <div class="view-container modal" id="visualModal3D">
-  <div class="modal-content" style="width: auto;">
+  <div class="modal-content" style="width: 50%; height: 40%">
     <span class="close" onclick="closeModal()">&times;</span>
     <input type="hidden" id="currentFile" />
 
@@ -191,6 +196,7 @@
 
      </section>
     </main>
+    
 
 
 
@@ -232,6 +238,8 @@
 
       // Load table
       loadLibraryTable();
+
+      //setInterval(() => { loadLibraryTable(); }, 30000);
 
 
 
@@ -326,3 +334,98 @@ uploadImageBtn.addEventListener("click", () => fileInput.click());
 
   </body>
 </html>
+
+
+<style>
+
+.badge-running {
+  color: #0a58ca;
+  font-weight: bold;
+}
+
+.badge-failed {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.status-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+/* Info cards */
+.info-card {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 4px solid #007bff;
+}
+
+.info-card h5 {
+    margin-top: 0;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-card h5 i {
+    color: #007bff;
+}
+
+/* Alerts */
+.alert {
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+.alert i {
+    margin-right: 8px;
+}
+
+/* Info box */
+.info-box {
+    background: #e7f3ff;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 15px;
+    border: 1px solid #b3d7ff;
+}
+
+
+
+
+</style>

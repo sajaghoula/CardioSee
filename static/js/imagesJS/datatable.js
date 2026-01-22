@@ -5,6 +5,7 @@ let filteredRows = []; // store rows after search
 
 // Sorting
 let sortState = {}; // remembers asc/desc
+let currentImageId = null;
 
 
 const current = {
@@ -12,6 +13,8 @@ const current = {
     coronal: 0,
     sagittal: 0
 };
+
+
 
 
 async function loadLibraryTable() {
@@ -34,6 +37,8 @@ async function loadLibraryTable() {
         physical_size: item.physical_size ?? "-",
         volume_cm3: item.volume_cm3 ?? "-",
         cardio: item.cardio ?? "-",
+        segmentation: item.segmentation || "-",
+        total_eat_volume: item.total_eat_volume || "not ready",
     }));
 
 
@@ -53,37 +58,37 @@ function renderTable(rows) {
     paginatedRows.forEach(row => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-            <td>${row.name}</td>
-            <td>${row.filetype}</td>
-            <td>${row.dominant_tissue}</td>
-            <td>${row.median}</td>
-            <td>${row.physical_size}</td>
-            <td>${row.volume_cm3}</td>
-            <td>${row.dark}</td>
-            <td>${row.cardio}</td>
+        <td>${row.name}</td>
+        <td>${row.filetype}</td>
+        <td>${row.total_eat_volume}</td>
+        
+        <td>${row.median}</td>
+        <td>${row.volume_cm3}</td>
+        <td>${row.dark}</td>
 
+        <td>
+            ${renderSegmentationCell(row)}
+        </td>
 
-            <td>
+        <td>
+            <button class="btn-small" onclick="viewInfo('${row.id}')">
+            <i class="fa-solid fa-info"></i>
+            </button>
 
-              <button class="btn-small" onclick="viewInfo('${row.id}')" title="Info">
-                  <i class="fa-solid fa-info"></i>
-              </button>
+            <button class="btn-small" onclick="viewImage('${row.id}')">
+            <i class="fas fa-eye"></i>
+            </button>
 
+            <button class="btn-small" onclick="view3D('${row.id}')">
+            3D
+            </button>
 
-              <button class="btn-small" onclick="viewImage('${row.id}')" title="View">
-                  <i class="fas fa-eye"></i>
-              </button>
-
-              <button class="btn-small" onclick="view3D('${row.id}')" title="3D">
-                  3D
-              </button>
-
-              <button class="btn-small btn-danger" onclick="deleteImage('${row.id}')" title="Delete">
-                  <i class="fas fa-trash-alt"></i>
-              </button>
-              
-          </td>
+            <button class="btn-small btn-danger" onclick="deleteImage('${row.id}')">
+            <i class="fas fa-trash-alt"></i>
+            </button>
+        </td>
         `;
+
         tableBody.appendChild(tr);
     });
 
@@ -147,8 +152,8 @@ searchInput.addEventListener("input", () => {
     filteredRows = window.tableRows.filter(row => 
         row.name.toLowerCase().includes(term) ||
         row.filetype.toLowerCase().includes(term) ||
-        row.createdBy.toLowerCase().includes(term) ||
-        row.dominant_tissue.toLowerCase().includes(term)
+        row.createdBy.toLowerCase().includes(term) 
+        //row.dominant_tissue.toLowerCase().includes(term)
         
     );
 
@@ -213,45 +218,119 @@ function viewInfo(imageId) {
     if (row.quality) {
         document.getElementById("qualityContent").innerHTML = `
             <br>
-            <table class="info-table">
-                <tr><th>Variable</th><th>Value</th></tr>
-                <tr><td>CNR</td><td>${row.quality.CNR}</td></tr>
-                <tr><td>SNR</td><td>${row.quality.SNR}</td></tr>
-                <tr><td>entropy</td><td>${row.quality.entropy}</td></tr>
-                <tr><td>kurtosis</td><td>${row.quality.kurtosis}</td></tr>
-                <tr><td>skewness</td><td>${row.quality.skewness}</td></tr>
-                <tr><td>sharpness</td><td>${row.quality.sharpness}</td></tr>
-            </table>
+<table class="info-table">
+    <tr><th>Variable</th><th>Value</th></tr>
+    <tr><td>CNR</td><td>${parseFloat(row.quality.CNR).toFixed(2)}</td></tr>
+    <tr><td>SNR</td><td>${parseFloat(row.quality.SNR).toFixed(2)}</td></tr>
+    <tr><td>entropy</td><td>${parseFloat(row.quality.entropy).toFixed(2)}</td></tr>
+    <tr><td>kurtosis</td><td>${parseFloat(row.quality.kurtosis).toFixed(2)}</td></tr>
+    <tr><td>skewness</td><td>${parseFloat(row.quality.skewness).toFixed(2)}</td></tr>
+</table>
 
 
         `;
     }
 
-    // ---- Geometry ----
-    if (row.geometry) {
-        const bb = row.geometry.bounding_box;
-        const com = row.geometry.center_of_mass;
+// ---- Geometry ----
+const geometryDiv = document.getElementById("geometryContent");
+const summaryDiv = document.getElementById("segmentationContent");
 
-        document.getElementById("geometryContent").innerHTML = `
-            <h4>Bounding Box</h4>
-            <table class="info-table">
-                <tr><th>Axis</th><th>Min</th><th>Max</th></tr>
-                <tr><td>X</td><td>${bb.min[0]}</td><td>${bb.max[0]}</td></tr>
-                <tr><td>Y</td><td>${bb.min[1]}</td><td>${bb.max[1]}</td></tr>
-                <tr><td>Z</td><td>${bb.min[2]}</td><td>${bb.max[2]}</td></tr>
-            </table>
+if (row.segmentation && row.segmentation.analysis_results && row.segmentation.analysis_results.pericardium_bounding_box) {
+    const pericardiumBB = row.segmentation.analysis_results.pericardium_bounding_box;
 
-            <h4>Center of Mass</h4>
-            <table class="info-table">
-                <tr><th>X</th><th>Y</th><th>Z</th></tr>
-                <tr>
-                    <td>${com[0].toFixed(2)}</td>
-                    <td>${com[1].toFixed(2)}</td>
-                    <td>${com[2].toFixed(2)}</td>
-                </tr>
-            </table>
+    geometryDiv.innerHTML = `
+        <h4>Pericardium Bounding Box (mm)</h4>
+        <table class="info-table">
+            <tr><th>Axis</th><th>Min</th><th>Max</th><th>Center</th><th>Size</th></tr>
+            <tr>
+                <td>X</td>
+                <td>${parseFloat(pericardiumBB.min_coords_mm[0]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.max_coords_mm[0]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.center_mm[0]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.dimensions_mm[0]).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Y</td>
+                <td>${parseFloat(pericardiumBB.min_coords_mm[1]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.max_coords_mm[1]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.center_mm[1]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.dimensions_mm[1]).toFixed(2)}</td>
+            </tr>
+            <tr>
+                <td>Z</td>
+                <td>${parseFloat(pericardiumBB.min_coords_mm[2]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.max_coords_mm[2]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.center_mm[2]).toFixed(2)}</td>
+                <td>${parseFloat(pericardiumBB.dimensions_mm[2]).toFixed(2)}</td>
+            </tr>
+        </table>
+        
+        <div class="info-box">
+            <strong>Volume:</strong> ${parseFloat(pericardiumBB.volume_cm3).toFixed(2)} cm³<br>
+        </div>
+    `;
+} else {
+    geometryDiv.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            Pericardium segmentation not available or analysis incomplete.
+        </div>
+    `;
+}
+
+
+
+// ---- Segmentation Summary Section ----
+
+if (row.segmentation) {
+    const analysis = row.segmentation.analysis_results;
+    const status = row.segmentation.status;
+    
+    let summaryHTML = `
+        <h4>Segmentation Analysis Summary</h4>
+        <div class="status-badge ${status === 'finished' ? 'status-success' : 'status-warning'}">
+            Status: ${status}
+        </div>
+    `;
+    
+    // Add analysis results if available
+    if (analysis) {
+        // Fat Analysis (if exists)
+        if (analysis.fat_analysis) {
+            const fat = analysis.fat_analysis;
+            summaryHTML += `
+                <div class="info-card">
+                    <h5><i class="fas fa-heartbeat"></i> Fat Analysis (EAT)</h5>
+                    <table class="info-table">
+                        <tr><td>Total EAT Volume</td><td>${parseFloat(fat.volume_total_eat_cm3).toFixed(2)} cm³</td></tr>
+                        <tr><td>Inflamed EAT</td><td>${parseFloat(fat.volume_inflamed_cm3).toFixed(2)} cm³ (${parseFloat(fat.inflamed_percentage).toFixed(1)}%)</td></tr>
+                        <tr><td>Non-Inflamed EAT</td><td>${parseFloat(fat.volume_non_inflamed_cm3).toFixed(2)} cm³</td></tr>
+                    </table>
+                </div>
+            `;
+        }
+        
+
+        
+    } else {
+        summaryHTML += `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                Analysis results are pending or not yet generated.
+            </div>
         `;
     }
+    
+    summaryDiv.innerHTML = summaryHTML;
+} else {
+    summaryDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            No segmentation data available for this record.
+        </div>
+    `;
+}
+
 
 
 
@@ -261,14 +340,14 @@ function viewInfo(imageId) {
 
             <br>
             <table class="info-table">
-                <tr><th>Variable</th><th>Value</th></tr>
-                <tr><td>Mean</td><td>${row.stats.mean}</td></tr>
-                <tr><td>Median</td><td>${row.stats.median}</td></tr>
-                <tr><td>Min</td><td>${row.stats.min}</td></tr>
-                <tr><td>Max</td><td>${row.stats.max}</td></tr>
-                <tr><td>STD</td><td>${row.stats.std}</td></tr>
-                <tr><td>Variance</td><td>${row.stats.var}</td></tr>
-                <tr><td>Shape</td><td>${row.stats.shape}</td></tr>   
+    <tr><th>Variable</th><th>Value</th></tr>
+    <tr><td>Mean</td><td>${parseFloat(row.stats.mean).toFixed(2)}</td></tr>
+    <tr><td>Median</td><td>${parseFloat(row.stats.median).toFixed(2)}</td></tr>
+    <tr><td>Min</td><td>${parseFloat(row.stats.min).toFixed(2)}</td></tr>
+    <tr><td>Max</td><td>${parseFloat(row.stats.max).toFixed(2)}</td></tr>
+    <tr><td>STD</td><td>${parseFloat(row.stats.std).toFixed(2)}</td></tr>
+    <tr><td>Variance</td><td>${parseFloat(row.stats.var).toFixed(2)}</td></tr>
+    <tr><td>Shape</td><td>${row.stats.shape}</td></tr>   
             </table>
 
         `;
@@ -309,9 +388,6 @@ function closeModal() {
 
 
 
-document.getElementById("closeInfoModal").onclick = function () {
-    document.getElementById("infoModal").style.display = "none";
-};
 
 window.onclick = function (event) {
     const modal = document.getElementById("infoModal");
@@ -326,6 +402,8 @@ window.onclick = function (event) {
 
 
 async function viewImage(imageId) {
+    currentImageId = imageId;   // store it
+
     const row = window.tableRows.find(r => r.id === imageId);
     if (!row) return alert("Image not found");
 
@@ -365,7 +443,8 @@ async function updateSlice(view, filename, firstTime) {
     const index = current[view] || 0;
 
     // Note: backticks used here
-    const res = await fetch(`/get_slice_2?view=${view}&index=${index}&file=${filename}&firstTime=${firstTime}`);
+    //const res = await fetch(`/get_slice_2?view=${view}&index=${index}&file=${filename}&firstTime=${firstTime}`);
+    const res = await fetch( `/get_slice_mapping?view=${view}&index=${index}&file=${filename}&image_id=${currentImageId}`);
     
     if (!res.ok) {
         console.error("Slice request failed:", res.status, await res.text());
@@ -719,3 +798,72 @@ async function deleteImage(imageId) {
     }, 3000);
 
 }
+
+//     🧊 3D
+
+function renderSegmentationCell(row) {
+
+  if (!row.segmentation) {
+    return `
+      <button class="btn-small btn-primary"
+              onclick="startSegmentation('${row.id}')">
+        🫀 Run
+      </button>
+    `;
+  }
+
+  const status = row.segmentation.status;
+
+  if (status === "pending" || status === "running") {
+    return `<span class="badge badge-running">⏳ Running</span>`;
+
+  }else if (status === "finished") {
+    return `
+      <button class="btn-small"> ✅ Done </button>
+    `;
+  }else if (status === "failed") {
+    return `
+      <button class="btn-small"
+              onclick="startSegmentation('${row.id}')">
+        🔁 Retry
+      </button>
+    `;
+  }else {
+        return `
+      <button class="btn-small btn-primary"
+              onclick="startSegmentation('${row.id}')">
+        🫀 Run
+      </button>
+    `;
+    }
+
+}
+
+
+
+
+
+
+async function startSegmentation(imageId) {
+  if (!confirm("Start cardiac segmentation for this image?")) return;
+
+  //try {
+
+    console.log('saja')
+
+    await fetch(`/start_segmentation/${imageId}`, { 
+      method: "POST",
+      headers: {
+      }
+    });
+
+    alert("Segmentation job started.");
+    await loadLibraryTable(); // refresh table
+
+  //} catch (err) {
+  //  console.error(err);
+  //  alert("Failed to start segmentation.");
+  //}
+}
+
+

@@ -314,7 +314,8 @@ viewDistributionAnalysisBtn.addEventListener("click", async () => {
     </div>
 `;
 
-        document.getElementById("chiSquareTable").innerHTML = html;
+//comment chi square in distribution analysis
+        //document.getElementById("chiSquareTable").innerHTML = html;
 
 
 

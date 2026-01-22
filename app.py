@@ -12,6 +12,7 @@ from library import lib_bp
 from settings import settings_bp
 from profile import profile_bp
 from dashboard import dashboard_bp
+from segmentation import segmentation_bp
 
 
 from flask_cors import CORS
@@ -54,7 +55,7 @@ if not firebase_admin._apps:
         # 🧪 Local development — use JSON file
         cred = credentials.Certificate("firebase-auth.json")
 
-firebase_admin.initialize_app(cred)
+    firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 
@@ -65,7 +66,7 @@ app.register_blueprint(lib_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(profile_bp)
 app.register_blueprint(dashboard_bp)
-
+app.register_blueprint(segmentation_bp)
 
 
 

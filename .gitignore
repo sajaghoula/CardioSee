@@ -45,3 +45,7 @@ __pycache__/
 
 # Firebase credentials
 firebase-auth.json
+serviceAccountKey.json
+CADS/
+segmentation/
+report_draft/
